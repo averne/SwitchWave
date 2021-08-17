@@ -1,0 +1,19 @@
+[submodule "ffmpeg"]
+	path = ffmpeg
+	url = https://github.com/averne/FFmpeg.git
+	branch = tx1
+[submodule "mpv"]
+	path = mpv
+	url = https://github.com/averne/mpv.git
+[submodule "libuam"]
+	path = libuam
+	url = https://github.com/averne/libuam.git
+[submodule "src/imgui"]
+	path = src/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "src/implot"]
+	path = src/implot
+	url = https://github.com/epezent/implot.git
+[submodule "src/inih"]
+	path = src/inih
+	url = https://github.com/benhoyt/inih.git
