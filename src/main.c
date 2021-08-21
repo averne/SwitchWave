@@ -70,8 +70,16 @@ int main(int argc, char *argv[])
     // Jesus Christ SDL, you suck!
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "no");
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
         die("SDL init failed");
+
+    for (int i = 0; i < 2; i++) {
+        if (SDL_JoystickOpen(i) == NULL) {
+            SDL_Log("SDL_JoystickOpen: %s\n", SDL_GetError());
+            SDL_Quit();
+            return -1;
+        }
+    }
 
     SDL_Window *window =
         SDL_CreateWindow("hi", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -159,6 +167,16 @@ int main(int argc, char *argv[])
                 printf("attempting to save screenshot to %s\n", cmd_scr[1]);
                 mpv_command_async(mpv, 0, cmd_scr);
             }
+            if (event.key.keysym.sym == SDLK_q)
+                goto done;
+            break;
+        case SDL_JOYBUTTONDOWN:
+            if (event.jbutton.button == 10) // Plus
+                goto done;
+            else if (event.jbutton.button == 0) {
+                const char *cmd_pause[] = {"cycle", "pause", NULL};
+                mpv_command_async(mpv, 0, cmd_pause);
+            }
             break;
         default:
             // Happens when there is new work for the render thread (such as
@@ -214,6 +232,10 @@ done:
     mpv_render_context_free(mpv_gl);
 
     mpv_detach_destroy(mpv);
+
+    SDL_GL_DeleteContext(glcontext);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
     printf("properly terminated\n");
     return 0;
