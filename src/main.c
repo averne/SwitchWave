@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     mpv_request_log_messages(mpv, "trace");
 
     mpv_set_option_string(mpv, "hwdec", "auto");
-    mpv_set_option_string(mpv, "hwdec-codecs", "mpeg2video");
+    mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video");
 
     // Jesus Christ SDL, you suck!
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "no");
