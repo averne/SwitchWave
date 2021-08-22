@@ -29,12 +29,13 @@ FFMPEG_CONFIG           :=  --enable-network \
                             --disable-programs
 MPV_CONFIG              :=  --enable-libmpv-static --disable-libmpv-shared \
                             --disable-cplayer --disable-iconv --disable-jpeg \
-                            --enable-sdl2 --enable-sdl2-audio --enable-sdl2-gamepad --enable-sdl2-video
+                            --enable-sdl2 --enable-sdl2-gamepad --enable-sdl2-video
 
 ifeq ($(strip $(HOST)),hos)
 
 FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
                             --cross-prefix=aarch64-none-elf- --arch=aarch64 --enable-pic
+MPV_CONFIG              +=   --disable-sdl2-audio --enable-hos-audio
 
 DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L
 ARCH                    :=  -march=armv8-a+crc+crypto+simd -mtune=cortex-a57 -mtp=soft -fpie
