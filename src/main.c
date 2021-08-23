@@ -73,13 +73,8 @@ int main(int argc, char *argv[])
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
         die("SDL init failed");
 
-    for (int i = 0; i < 2; i++) {
-        if (SDL_JoystickOpen(i) == NULL) {
-            SDL_Log("SDL_JoystickOpen: %s\n", SDL_GetError());
-            SDL_Quit();
-            return -1;
-        }
-    }
+    for (int i = 0; i < 2; i++)
+        SDL_JoystickOpen(i);
 
     SDL_Window *window =
         SDL_CreateWindow("hi", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
