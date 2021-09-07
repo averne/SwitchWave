@@ -30,6 +30,11 @@ void userAppExit() {
 #endif
 
 int main(int argc, char **argv) {
+#ifdef __SWITCH__
+    if (argc < 2)
+        argv[1] = "/Videos/test_h264.h264";
+#endif
+
     mpv_handle *mpv = mpv_create();
     if (!mpv)
         die("context init failed");
@@ -53,8 +58,12 @@ int main(int argc, char **argv) {
         die("failed to load file");
 
     // Let it play, and wait until the user quits.
-    while (1) {
-        mpv_event *event = mpv_wait_event(mpv, 10000);
+    bool should_quit = false;
+    while (!should_quit) {
+#ifdef __SWITCH__
+        should_quit = !appletMainLoop();
+#endif
+        mpv_event *event = mpv_wait_event(mpv, 0);
         if (event->event_id == MPV_EVENT_LOG_MESSAGE) {
             mpv_event_log_message *msg = event->data;
             printf("[%s]: %s", msg->prefix, msg->text);
