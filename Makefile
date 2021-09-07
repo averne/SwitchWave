@@ -10,8 +10,7 @@ SOURCES                 :=  src
 ROMFS                   :=
 BUILD                   :=  build-$(HOST)
 INSTALL                 :=  $(TOPDIR)/build-$(HOST)/install
-PACKAGES                :=  mpv libavcodec libavdevice libavformat libavfilter libavutil libswscale libswresample \
-                            sdl2
+PACKAGES                :=  mpv libavcodec libavdevice libavformat libavfilter libavutil libswscale libswresample
 LIBDIRS                 :=  $(INSTALL)
 
 APP_TITLE               :=  Player
@@ -28,14 +27,14 @@ FFMPEG_CONFIG           :=  --enable-network \
                             --disable-doc \
                             --disable-programs
 MPV_CONFIG              :=  --enable-libmpv-static --disable-libmpv-shared \
-                            --disable-cplayer --disable-iconv --disable-jpeg \
-                            --enable-sdl2 --enable-sdl2-gamepad --enable-sdl2-video
+                            --disable-cplayer --disable-iconv --disable-jpeg
 
 ifeq ($(strip $(HOST)),hos)
 
 FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
                             --cross-prefix=aarch64-none-elf- --arch=aarch64 --enable-pic
-MPV_CONFIG              +=   --disable-sdl2-audio --enable-hos-audio
+MPV_CONFIG              +=  --enable-hos-audio --enable-hos-video \
+                            --disable-gl --disable-plain-gl
 
 DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L
 ARCH                    :=  -march=armv8-a+crc+crypto+simd -mtune=cortex-a57 -mtp=soft -fpie

@@ -38,7 +38,12 @@ int main(int argc, char **argv) {
     if (mpv_initialize(mpv) < 0)
         die("mpv init failed");
 
-    mpv_request_log_messages(mpv, "debug");
+    mpv_request_log_messages(mpv, "v");
+
+#ifdef __SWITCH__
+    mpv_set_option_string(mpv, "ao", "hos");
+    mpv_set_option_string(mpv, "vo", "hos");
+#endif
 
     mpv_set_option_string(mpv, "hwdec", "auto");
     mpv_set_option_string(mpv, "hwdec-codecs", "h264,mpeg1video,mpeg2video");
@@ -53,11 +58,11 @@ int main(int argc, char **argv) {
         if (event->event_id == MPV_EVENT_LOG_MESSAGE) {
             mpv_event_log_message *msg = event->data;
             printf("[%s]: %s", msg->prefix, msg->text);
-        }
-        else
-            printf("event: %s\n", mpv_event_name(event->event_id));
-        if (event->event_id == MPV_EVENT_SHUTDOWN)
+        } else if (event->event_id == MPV_EVENT_SHUTDOWN) {
             break;
+        } else if (event->event_id != MPV_EVENT_NONE) {
+            printf("event: %s\n", mpv_event_name(event->event_id));
+        }
     }
 
     mpv_terminate_destroy(mpv);
