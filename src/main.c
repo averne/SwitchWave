@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include <SDL2/SDL.h>
 
@@ -51,7 +52,7 @@ int main(int argc, char **argv) {
 #endif
 
     mpv_set_option_string(mpv, "hwdec", "auto");
-    mpv_set_option_string(mpv, "hwdec-codecs", "h264,mpeg1video,mpeg2video");
+    mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9");
 
     const char *cmd[] = { "loadfile", argv[1], NULL };
     if (mpv_command(mpv, cmd) < 0)
