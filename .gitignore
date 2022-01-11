@@ -37,6 +37,7 @@
 *.nacp
 *.npdm
 *.dksh
+*.elf
 
 *.ini
 *.log
@@ -51,3 +52,5 @@
 .vscode
 archive
 build*/
+
+.gdbinit

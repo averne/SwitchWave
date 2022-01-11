@@ -22,7 +22,6 @@ FFMPEG_CONFIG           :=  --enable-network \
                             --enable-gpl \
                             --enable-tx1 \
                             --enable-static --disable-shared \
-                            --disable-autodetect --disable-runtime-cpudetect --disable-debug \
                             --enable-zlib --enable-bzlib --enable-libass --enable-libfreetype --enable-libfribidi \
                             --disable-doc \
                             --disable-programs
@@ -32,13 +31,13 @@ MPV_CONFIG              :=  --enable-libmpv-static --disable-libmpv-shared \
 ifeq ($(strip $(HOST)),hos)
 
 FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
-                            --cross-prefix=aarch64-none-elf- --arch=aarch64 --enable-pic
-MPV_CONFIG              +=  --enable-hos-audio --enable-hos-video \
-                            --disable-gl --disable-plain-gl
+                            --cross-prefix=aarch64-none-elf- --arch=aarch64 --enable-pic \
+							--disable-autodetect --disable-runtime-cpudetect --disable-debug
+MPV_CONFIG              +=  --disable-sdl2 --disable-gl --disable-plain-gl --enable-hos-audio --enable-deko3d
 
 DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L
 ARCH                    :=  -march=armv8-a+crc+crypto+simd -mtune=cortex-a57 -mtp=soft -fpie
-FLAGS                   :=  -O2 -g -Wall -Wextra -pipe -ffunction-sections -fdata-sections
+FLAGS                   :=  -O0 -g -Wall -Wextra -pipe -ffunction-sections -fdata-sections
 CFLAGS                  :=  -std=gnu11
 CXXFLAGS                :=  -std=gnu++20 -fno-rtti -fno-exceptions
 ASFLAGS                 :=
@@ -98,9 +97,9 @@ NACP_TARGET             :=  $(OUTPUT:.nro=.nacp)
 else
 OUTPUT                  :=  $(ELF_TARGET)
 endif
-CFILES                  :=  $(shell find $(SOURCES) -name *.c)
-CPPFILES                :=  $(shell find $(SOURCES) -name *.cpp)
-SFILES                  :=  $(shell find $(SOURCES) -name *.s -or -name *.S)
+CFILES                  :=  $(shell find $(SOURCES) -name '*.c')
+CPPFILES                :=  $(shell find $(SOURCES) -name '*.cpp')
+SFILES                  :=  $(shell find $(SOURCES) -name '*.s' -or -name '*.S')
 
 OFILES                  :=  $(CFILES:%=$(BUILD)/%.o) $(CPPFILES:%=$(BUILD)/%.o) $(SFILES:%=$(BUILD)/%.o)
 DFILES                  :=  $(OFILES:.o=.d)
@@ -113,7 +112,8 @@ FLAGS                   :=  $(shell pkg-config --cflags $(PACKAGES)) $(FLAGS)
 CFLAGS                  :=  $(DEFINES_FLAGS) $(INCLUDE_FLAGS) $(ARCH) $(FLAGS) $(CFLAGS)
 CXXFLAGS                :=  $(DEFINES_FLAGS) $(INCLUDE_FLAGS) $(ARCH) $(FLAGS) $(CXXFLAGS)
 LDFLAGS                 :=  $(foreach dir,$(LIBDIRS),-L$(dir)/lib) $(ARCH) $(LDFLAGS) $(LINKS)
-LIB_WARNINGS            :=  -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-parameter
+LIB_WARNINGS            :=  -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-parameter \
+                            -Wno-deprecated-declarations -Wno-declaration-after-statement -Wno-undef
 
 export CFLAGS
 export CXXFLAGS
