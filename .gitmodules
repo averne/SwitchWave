@@ -5,3 +5,6 @@
 [submodule "mpv"]
 	path = mpv
 	url = https://github.com/averne/mpv.git
+[submodule "libuam"]
+	path = libuam
+	url = git@github.com:averne/libuam.git

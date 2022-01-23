@@ -30,6 +30,8 @@ MPV_CONFIG              :=  --enable-libmpv-static --disable-libmpv-shared \
 
 ifeq ($(strip $(HOST)),hos)
 
+PACKAGES                +=  uam
+
 FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
                             --cross-prefix=aarch64-none-elf- --arch=aarch64 --enable-pic \
 							--disable-autodetect --disable-runtime-cpudetect --disable-debug
@@ -76,6 +78,7 @@ PKG_CONFIG_PATH         :=  $(PORTLIBS)/lib/pkgconfig
 LIBDIRS                 :=  $(LIBDIRS) $(PORTLIBS) $(LIBNX)
 
 export PATH             :=  $(DEVKITPRO)/tools/bin:$(DEVKITPRO)/devkitA64/bin:$(PORTLIBS)/bin:$(PATH)
+export PKG_CONFIG_LIBDIR =
 
 endif
 
@@ -87,7 +90,7 @@ export AS               :=  $(PREFIX)as
 export AR               :=  $(PREFIX)ar
 export LD               :=  $(PREFIX)g++
 export NM               :=  $(PREFIX)nm
-export PKG_CONFIG       :=  $(PREFIX)pkg-config
+export PKG_CONFIG       :=  pkg-config
 export SHELL            :=  env PATH=$(PATH) PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) $(SHELL)
 
 ELF_TARGET              :=  $(BUILD)/$(TARGET)
@@ -152,13 +155,13 @@ endif
 # -----------------------------------------------
 .SUFFIXES:
 .PHONY: all clean mrproper \
-        configure configure-ffmpeg configure-mpv \
-        libraries build-ffmpeg build-mpv
+        configure configure-ffmpeg configure-mpv configure-uam \
+        libraries build-ffmpeg build-mpv build-uam
 .PRECIOUS: %.nacp
 
 all: $(OUTPUT)
 
-configure: configure-ffmpeg configure-mpv
+configure: configure-ffmpeg configure-mpv configure-uam
 
 configure-ffmpeg:
 	@echo Configuring ffmpeg with flags $(FFMPEG_CONFIG)
@@ -178,7 +181,13 @@ configure-mpv:
 		./waf configure -o $(TOPDIR)/$(BUILD)/mpv --prefix=$(INSTALL) $(MPV_CONFIG)
 	@sed -i 's/#define HAVE_POSIX 1/#define HAVE_POSIX 0/' $(BUILD)/mpv/config.h
 
-libraries: build-ffmpeg build-mpv
+configure-uam:
+	cd $(TOPDIR)/libuam; \
+		$(DEVKITPRO)/meson-toolchain.sh switch > crossfile.txt
+	cd $(TOPDIR)/libuam; \
+		meson $(TOPDIR)/$(BUILD)/libuam --cross-file=crossfile.txt --prefix=$(INSTALL)
+
+libraries: build-ffmpeg build-mpv build-uam
 
 build-ffmpeg:
 	@$(MAKE) --no-print-directory -C $(BUILD)/ffmpeg install
@@ -186,6 +195,9 @@ build-ffmpeg:
 build-mpv:
 	@cd $(BUILD)/mpv; \
 		$(TOPDIR)/mpv/waf install
+
+build-uam:
+	@meson install -C $(BUILD)/libuam
 
 %.nro: % $(ROMFS_TARGET) $(APP_ICON) $(NACP_TARGET)
 	@echo "NRO     " $@
