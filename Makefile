@@ -182,9 +182,9 @@ configure-mpv:
 	@sed -i 's/#define HAVE_POSIX 1/#define HAVE_POSIX 0/' $(BUILD)/mpv/config.h
 
 configure-uam:
-	cd $(TOPDIR)/libuam; \
+	@cd $(TOPDIR)/libuam; \
 		$(DEVKITPRO)/meson-toolchain.sh switch > crossfile.txt
-	cd $(TOPDIR)/libuam; \
+	@cd $(TOPDIR)/libuam; \
 		meson $(TOPDIR)/$(BUILD)/libuam --cross-file=crossfile.txt --prefix=$(INSTALL)
 
 libraries: build-ffmpeg build-mpv build-uam
@@ -235,7 +235,7 @@ clean:
 	@echo Cleaning...
 	@rm -rf $(OUTPUT) $(addprefix $(BUILD)/,$(SOURCES))
 
-mrproper: clean clean-ffmpeg clean-mpv
+mrproper: clean clean-ffmpeg clean-mpv clean-uam
 	@rm -rf $(INSTALL)
 
 clean-ffmpeg:
@@ -244,5 +244,8 @@ clean-ffmpeg:
 clean-mpv:
 	@cd $(BUILD)/mpv; \
 		$(TOPDIR)/mpv/waf clean
+
+clean-uam:
+	@meson compile -C $(BUILD)/libuam --clean
 
 -include $(DFILES)
