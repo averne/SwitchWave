@@ -4,7 +4,7 @@ endif
 
 TOPDIR                  ?=  $(CURDIR)
 
-TARGET                  :=  Player
+TARGET                  :=  AmpNX
 INCLUDES                :=  include
 SOURCES                 :=  src
 ROMFS                   :=
@@ -13,7 +13,7 @@ INSTALL                 :=  $(TOPDIR)/build-$(HOST)/install
 PACKAGES                :=  mpv libavcodec libavdevice libavformat libavfilter libavutil libswscale libswresample
 LIBDIRS                 :=  $(INSTALL)
 
-APP_TITLE               :=  Player
+APP_TITLE               :=  AmpNX
 APP_AUTHOR              :=  averne
 APP_ICON                :=
 APP_VERSION             :=

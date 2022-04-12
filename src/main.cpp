@@ -136,16 +136,18 @@ int main(int argc, const char **argv) {
     mpv_request_log_messages(mpv, "debug");
 
     mpv_set_option_string(mpv, "config", "yes");
-    mpv_set_option_string(mpv, "config-dir", "/switch/Player/mpv");
+    mpv_set_option_string(mpv, "config-dir", "/switch/AmpNX");
+
+    if (mpv_initialize(mpv) < 0)
+        die("mpv init failed");
+
+    // mpv_set_option_string(mpv, "gpu-shader-cache-dir", "~~/shadercache");
     mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
 	mpv_set_option_string(mpv, "vd-lavc-threads", "4");
 	mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "all");
 	// mpv_set_option_string(mpv, "vd-lavc-fast", "");
     mpv_set_option_string(mpv, "hwdec", "auto");
     mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9");
-
-    if (mpv_initialize(mpv) < 0)
-        die("mpv init failed");
 
     char *api_type = const_cast<char *>(MPV_RENDER_API_TYPE_DEKO3D);
     mpv_deko3d_init_params dk_init = {
