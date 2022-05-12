@@ -18,7 +18,7 @@
 
 using namespace std::chrono_literals;
 
-#define NUM_SWAPCHAIN_IMAGES 2
+#define NUM_SWAPCHAIN_IMAGES 3
 
 static void die(const char *msg) {
     std::fprintf(stderr, "%s\n", msg);
@@ -64,24 +64,29 @@ void render_thread_fn(std::stop_token token, RedrawContext &ctx) {
         if (!(mpv_render_context_update(ctx.mpv_gl) & MPV_RENDER_UPDATE_FRAME))
             continue;
 
-        int slot = ctx.queue.acquireImage(ctx.swapchain);
+        int slot;
+        dk::Fence fence;
+        ctx.swapchain.acquireImage(slot, fence);
 
         mpv_deko3d_fbo fbo = {
-            .tex = &ctx.images[slot],
-            .w = 1280, .h = 720,
+            .tex    = &ctx.images[slot],
+            .fence  = &fence,
+            .w      = 1280,
+            .h      = 720,
             .format = DkImageFormat_RGBA8_Unorm,
         };
+
         int flip_y = 1;
         mpv_render_param params[] = {
             {MPV_RENDER_PARAM_DEKO3D_FBO, &fbo},
-            {MPV_RENDER_PARAM_FLIP_Y, &flip_y},
+            {MPV_RENDER_PARAM_FLIP_Y,     &flip_y},
             {},
         };
 
-        // Need to wait before rendering otherwise it will cause tearing
-        ctx.queue.waitIdle();
-
         mpv_render_context_render(ctx.mpv_gl, params);
+
+        fence.wait();
+
         ctx.queue.presentImage(ctx.swapchain, slot);
         mpv_render_context_report_swap(ctx.mpv_gl);
     }
@@ -128,7 +133,6 @@ int main(int argc, const char **argv) {
     dk::UniqueSwapchain swapchain = dk::SwapchainMaker(dk, nwindowGetDefault(), swapchain_images)
         .create();
 
-
     mpv_handle *mpv = mpv_create();
     if (!mpv)
         die("context init failed");
@@ -141,7 +145,6 @@ int main(int argc, const char **argv) {
     if (mpv_initialize(mpv) < 0)
         die("mpv init failed");
 
-    // mpv_set_option_string(mpv, "gpu-shader-cache-dir", "~~/shadercache");
     mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
 	mpv_set_option_string(mpv, "vd-lavc-threads", "4");
 	mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "all");
