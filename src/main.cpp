@@ -20,13 +20,40 @@ using namespace std::chrono_literals;
 
 #define NUM_SWAPCHAIN_IMAGES 3
 
+struct DrawContext {
+    dk::Device &dk;
+    dk::Queue  &queue;
+
+    int image_width = 1280, image_height = 720;
+    dk::UniqueMemBlock image_memblock = {};
+    std::array<dk::Image, NUM_SWAPCHAIN_IMAGES> images = {};
+    dk::UniqueSwapchain swapchain = {};
+    std::atomic_bool need_swapchain_rebuild = true;
+
+    mpv_render_context *mpv_gl;
+
+    std::condition_variable redraw_condvar = {};
+    std::mutex redraw_mutex = {};
+    std::atomic_int redraw_count = 0;
+};
+
 static void die(const char *msg) {
     std::fprintf(stderr, "%s\n", msg);
     std::exit(1);
 }
 
+namespace {
+
+#ifdef __SWITCH__
+AppletHookCookie applet_hook_cookie;
+#endif
+
+} // namespace
+
 #ifdef __SWITCH__
 extern "C" void userAppInit(void) {
+    appletLockExit();
+
     socketInitializeDefault();
     nxlinkStdio();
 
@@ -37,28 +64,70 @@ extern "C" void userAppExit() {
     plExit();
 
     socketExit();
+
+    appletUnlockExit();
+}
+
+void applet_hook_cb(AppletHookType hook, void *param) {
+    auto *ctx = static_cast<DrawContext *>(param);
+	switch (hook) {
+        case AppletHookType_OnOperationMode:
+            ctx->need_swapchain_rebuild = true;
+        default:
+            break;
+	}
 }
 #endif
 
-struct RedrawContext {
-    dk::Queue     &queue;
-    dk::Swapchain &swapchain;
-    std::array<dk::Image, NUM_SWAPCHAIN_IMAGES> images;
+void rebuild_swapchain(DrawContext &ctx) {
+    if (appletGetOperationMode() == AppletOperationMode_Console)
+        ctx.image_width = 1920, ctx.image_height = 1080;
+    else
+        ctx.image_width = 1280, ctx.image_height = 720;
 
-    mpv_render_context *mpv_gl;
+    std::printf("Rebuilding swapchain: %ux%u\n", ctx.image_width, ctx.image_height);
 
-    std::condition_variable redraw_condvar = {};
-    std::mutex redraw_mutex = {};
-    std::atomic_int redraw_count = 0;
-};
+    // TODO: Remove once a release of deko3d has been published with #fd315f0
+    ctx.swapchain      = nullptr;
+    ctx.image_memblock = nullptr;
 
-void render_thread_fn(std::stop_token token, RedrawContext &ctx) {
+    dk::ImageLayout fb_layout;
+    dk::ImageLayoutMaker(ctx.dk)
+        .setFormat(DkImageFormat_RGBA8_Unorm)
+        .setDimensions(ctx.image_width, ctx.image_height)
+        .setFlags(DkImageFlags_UsageRender | DkImageFlags_UsagePresent | DkImageFlags_Usage2DEngine)
+        .initialize(fb_layout);
+
+    std::size_t fb_size  = fb_layout.getSize();
+    std::size_t fb_align = fb_layout.getAlignment();
+    fb_size = (fb_size + fb_align - 1) & ~(fb_align - 1);
+
+    ctx.image_memblock = dk::MemBlockMaker(ctx.dk, NUM_SWAPCHAIN_IMAGES * fb_size)
+        .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image)
+        .create();
+
+    std::array<const DkImage *, NUM_SWAPCHAIN_IMAGES> swapchain_images;
+    for (int i = 0; i < NUM_SWAPCHAIN_IMAGES; ++i) {
+        ctx.images[i].initialize(fb_layout, ctx.image_memblock, i * fb_size);
+        swapchain_images[i] = &ctx.images[i];
+    }
+
+    ctx.swapchain = dk::SwapchainMaker(ctx.dk, nwindowGetDefault(), swapchain_images)
+        .create();
+
+    ctx.need_swapchain_rebuild = false;
+}
+
+void render_thread_fn(std::stop_token token, DrawContext &ctx) {
     while (!token.stop_requested()) {
         if (!ctx.redraw_count) {
             std::unique_lock lk(ctx.redraw_mutex);
             if (ctx.redraw_condvar.wait_for(lk, 100ms) == std::cv_status::timeout)
                 continue;
         }
+
+        if (ctx.need_swapchain_rebuild)
+            rebuild_swapchain(ctx);
 
         ctx.redraw_count--;
         if (!(mpv_render_context_update(ctx.mpv_gl) & MPV_RENDER_UPDATE_FRAME))
@@ -71,8 +140,8 @@ void render_thread_fn(std::stop_token token, RedrawContext &ctx) {
         mpv_deko3d_fbo fbo = {
             .tex    = &ctx.images[slot],
             .fence  = &fence,
-            .w      = 1280,
-            .h      = 720,
+            .w      = ctx.image_width,
+            .h      = ctx.image_height,
             .format = DkImageFormat_RGBA8_Unorm,
         };
 
@@ -95,7 +164,7 @@ void render_thread_fn(std::stop_token token, RedrawContext &ctx) {
 int main(int argc, const char **argv) {
 #ifdef __SWITCH__
     if (argc < 2)
-        argc = 2, argv[1] = "/Videos/test.mkv";
+        argc = 2, argv[1] = "/Videos/evangelion.mkv";
 #endif
 
     std::printf("Starting player\n");
@@ -104,33 +173,8 @@ int main(int argc, const char **argv) {
         .setFlags(DkDeviceFlags_OriginLowerLeft)
         .create();
 
-    dk::ImageLayout fb_layout;
-    dk::ImageLayoutMaker(dk)
-        .setFormat(DkImageFormat_RGBA8_Unorm)
-        .setDimensions(1280, 720)
-        .setFlags(DkImageFlags_UsageRender | DkImageFlags_UsagePresent | DkImageFlags_Usage2DEngine)
-        .initialize(fb_layout);
-
-    std::size_t fb_size  = fb_layout.getSize();
-    std::size_t fb_align = fb_layout.getAlignment();
-    fb_size = (fb_size + fb_align - 1) & ~(fb_align - 1);
-
-    dk::UniqueMemBlock fb_memblock = dk::MemBlockMaker(dk, NUM_SWAPCHAIN_IMAGES * fb_size)
-        .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image)
-        .create();
-
-    std::array<dk::Image, NUM_SWAPCHAIN_IMAGES> framebuffer_images;
-    std::array<const DkImage *, NUM_SWAPCHAIN_IMAGES> swapchain_images;
-    for (int i = 0; i < NUM_SWAPCHAIN_IMAGES; ++i) {
-        framebuffer_images[i].initialize(fb_layout, fb_memblock, i * fb_size);
-        swapchain_images[i] = &framebuffer_images[i];
-    }
-
     dk::UniqueQueue present_queue = dk::QueueMaker(dk)
         .setFlags(DkQueueFlags_Graphics)
-        .create();
-
-    dk::UniqueSwapchain swapchain = dk::SwapchainMaker(dk, nwindowGetDefault(), swapchain_images)
         .create();
 
     mpv_handle *mpv = mpv_create();
@@ -145,12 +189,15 @@ int main(int argc, const char **argv) {
     if (mpv_initialize(mpv) < 0)
         die("mpv init failed");
 
-    mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
-	mpv_set_option_string(mpv, "vd-lavc-threads", "4");
-	mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "all");
-	// mpv_set_option_string(mpv, "vd-lavc-fast", "");
     mpv_set_option_string(mpv, "hwdec", "auto");
     mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9");
+    mpv_set_option_string(mpv, "framedrop", "decoder+vo");
+    mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
+	mpv_set_option_string(mpv, "vd-lavc-threads", "4");
+	mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "nonkey");
+	mpv_set_option_string(mpv, "vd-lavc-skipframe", "nonref");
+	mpv_set_option_string(mpv, "vd-lavc-framedrop", "nonref");
+	mpv_set_option_string(mpv, "vd-lavc-fast", "yes");
 
     char *api_type = const_cast<char *>(MPV_RENDER_API_TYPE_DEKO3D);
     mpv_deko3d_init_params dk_init = {
@@ -168,10 +215,9 @@ int main(int argc, const char **argv) {
     if (mpv_render_context_create(&mpv_gl, mpv, params) < 0)
         die("failed to initialize mpv GL context");
 
-    RedrawContext ctx = {
+    DrawContext ctx = {
+        .dk        = dk,
         .queue     = present_queue,
-        .swapchain = swapchain,
-        .images    = framebuffer_images,
         .mpv_gl    = mpv_gl,
     };
 
@@ -180,13 +226,15 @@ int main(int argc, const char **argv) {
 
     mpv_render_context_set_update_callback(mpv_gl,
         +[](void *user) {
-            auto *ctx = static_cast<RedrawContext *>(user);
+            auto *ctx = static_cast<DrawContext *>(user);
             std::unique_lock lk(ctx->redraw_mutex);
             ctx->redraw_count++;
             ctx->redraw_condvar.notify_one();
         },
         &ctx
     );
+
+    appletHook(&applet_hook_cookie, applet_hook_cb, &ctx);
 
     auto render_thread = std::jthread(render_thread_fn, std::ref(ctx));
 
