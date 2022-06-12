@@ -30,6 +30,8 @@ struct DrawContext {
     dk::UniqueSwapchain swapchain = {};
     std::atomic_bool need_swapchain_rebuild = true;
 
+    dk::UniqueCmdBuf &cmdbuf;
+
     mpv_render_context *mpv_gl;
 
     std::condition_variable redraw_condvar = {};
@@ -51,31 +53,14 @@ AppletHookCookie applet_hook_cookie;
 } // namespace
 
 #ifdef __SWITCH__
-extern "C" void userAppInit(void) {
-    appletLockExit();
-
-    socketInitializeDefault();
-    nxlinkStdio();
-
-    plInitialize(PlServiceType_User);
-}
-
-extern "C" void userAppExit() {
-    plExit();
-
-    socketExit();
-
-    appletUnlockExit();
-}
-
 void applet_hook_cb(AppletHookType hook, void *param) {
     auto *ctx = static_cast<DrawContext *>(param);
-	switch (hook) {
+    switch (hook) {
         case AppletHookType_OnOperationMode:
             ctx->need_swapchain_rebuild = true;
         default:
             break;
-	}
+    }
 }
 #endif
 
@@ -95,7 +80,8 @@ void rebuild_swapchain(DrawContext &ctx) {
     dk::ImageLayoutMaker(ctx.dk)
         .setFormat(DkImageFormat_RGBA8_Unorm)
         .setDimensions(ctx.image_width, ctx.image_height)
-        .setFlags(DkImageFlags_UsageRender | DkImageFlags_UsagePresent | DkImageFlags_Usage2DEngine)
+        .setFlags(DkImageFlags_HwCompression | DkImageFlags_UsageRender |
+            DkImageFlags_UsagePresent | DkImageFlags_Usage2DEngine)
         .initialize(fb_layout);
 
     std::size_t fb_size  = fb_layout.getSize();
@@ -119,6 +105,8 @@ void rebuild_swapchain(DrawContext &ctx) {
 }
 
 void render_thread_fn(std::stop_token token, DrawContext &ctx) {
+    dk::Fence ready_fence{}, done_fence{};
+
     while (!token.stop_requested()) {
         if (!ctx.redraw_count) {
             std::unique_lock lk(ctx.redraw_mutex);
@@ -134,15 +122,21 @@ void render_thread_fn(std::stop_token token, DrawContext &ctx) {
             continue;
 
         int slot;
-        dk::Fence fence;
-        ctx.swapchain.acquireImage(slot, fence);
+        ctx.swapchain.acquireImage(slot, ready_fence);
+
+        // Wait for mpv's previous rendering task to complete
+        // Starting a new render cycle would clear the command buffer for the in-flight frame
+        // Despite the gpu-side wait inserted before queuing the frame, the rendering is not guaranteed
+        // to have completed when the dequeue operation returns, when using triple+ buffering
+        done_fence.wait();
 
         mpv_deko3d_fbo fbo = {
-            .tex    = &ctx.images[slot],
-            .fence  = &fence,
-            .w      = ctx.image_width,
-            .h      = ctx.image_height,
-            .format = DkImageFormat_RGBA8_Unorm,
+            .tex         = &ctx.images[slot],
+            .ready_fence = &ready_fence,
+            .done_fence  = &done_fence,
+            .w           = ctx.image_width,
+            .h           = ctx.image_height,
+            .format      = DkImageFormat_RGBA8_Unorm,
         };
 
         int flip_y = 1;
@@ -154,18 +148,26 @@ void render_thread_fn(std::stop_token token, DrawContext &ctx) {
 
         mpv_render_context_render(ctx.mpv_gl, params);
 
-        fence.wait();
+        // Wait for the rendering to complete
+        ctx.queue.waitFence(done_fence);
 
         ctx.queue.presentImage(ctx.swapchain, slot);
         mpv_render_context_report_swap(ctx.mpv_gl);
     }
+
+    // Wait for the rendering tasks to complete
+    // Returning would make the fence memory invalid
+    ctx.queue.waitIdle();
 }
 
 int main(int argc, const char **argv) {
 #ifdef __SWITCH__
     if (argc < 2)
-        argc = 2, argv[1] = "/Videos/evangelion.mkv";
+        argc = 2, argv[1] = "/Videos/akira60.mp4";
 #endif
+
+    if (auto rc = appletLockExit(); R_FAILED(rc))
+        std::printf("Failed to lock exit\n");
 
     std::printf("Starting player\n");
 
@@ -176,6 +178,14 @@ int main(int argc, const char **argv) {
     dk::UniqueQueue present_queue = dk::QueueMaker(dk)
         .setFlags(DkQueueFlags_Graphics)
         .create();
+
+    dk::UniqueMemBlock cmdbuf_memblock = dk::MemBlockMaker(dk, 0x1000)
+        .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached)
+        .create();
+
+    dk::UniqueCmdBuf cmdbuf = dk::CmdBufMaker(dk)
+        .create();
+    cmdbuf.addMemory(cmdbuf_memblock, 0, cmdbuf_memblock.getSize());
 
     mpv_handle *mpv = mpv_create();
     if (!mpv)
@@ -193,11 +203,11 @@ int main(int argc, const char **argv) {
     mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9");
     mpv_set_option_string(mpv, "framedrop", "decoder+vo");
     mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
-	mpv_set_option_string(mpv, "vd-lavc-threads", "4");
-	mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "nonkey");
-	mpv_set_option_string(mpv, "vd-lavc-skipframe", "nonref");
-	mpv_set_option_string(mpv, "vd-lavc-framedrop", "nonref");
-	mpv_set_option_string(mpv, "vd-lavc-fast", "yes");
+    mpv_set_option_string(mpv, "vd-lavc-threads", "4");
+    mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "nonkey");
+    mpv_set_option_string(mpv, "vd-lavc-skipframe", "nonref");
+    mpv_set_option_string(mpv, "vd-lavc-framedrop", "nonref");
+    mpv_set_option_string(mpv, "vd-lavc-fast", "yes");
 
     char *api_type = const_cast<char *>(MPV_RENDER_API_TYPE_DEKO3D);
     mpv_deko3d_init_params dk_init = {
@@ -218,6 +228,7 @@ int main(int argc, const char **argv) {
     DrawContext ctx = {
         .dk        = dk,
         .queue     = present_queue,
+        .cmdbuf    = cmdbuf,
         .mpv_gl    = mpv_gl,
     };
 
@@ -291,6 +302,8 @@ done:
 
     present_queue.waitIdle();
 
-    std::printf("properly terminated\n");
+    appletUnlockExit();
+
+    std::printf("Properly exiting\n");
     return 0;
 }
