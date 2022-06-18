@@ -72,6 +72,8 @@ void rebuild_swapchain(DrawContext &ctx) {
 
     std::printf("Rebuilding swapchain: %ux%u\n", ctx.image_width, ctx.image_height);
 
+    ctx.queue.waitIdle();
+
     // TODO: Remove once a release of deko3d has been published with #fd315f0
     ctx.swapchain      = nullptr;
     ctx.image_memblock = nullptr;
@@ -124,10 +126,6 @@ void render_thread_fn(std::stop_token token, DrawContext &ctx) {
         int slot;
         ctx.swapchain.acquireImage(slot, ready_fence);
 
-        // Wait for mpv's previous rendering task to complete
-        // Starting a new render cycle would clear the command buffer for the in-flight frame
-        // Despite the gpu-side wait inserted before queuing the frame, the rendering is not guaranteed
-        // to have completed when the dequeue operation returns, when using triple+ buffering
         done_fence.wait();
 
         mpv_deko3d_fbo fbo = {
@@ -139,10 +137,8 @@ void render_thread_fn(std::stop_token token, DrawContext &ctx) {
             .format      = DkImageFormat_RGBA8_Unorm,
         };
 
-        int flip_y = 1;
         mpv_render_param params[] = {
             {MPV_RENDER_PARAM_DEKO3D_FBO, &fbo},
-            {MPV_RENDER_PARAM_FLIP_Y,     &flip_y},
             {},
         };
 
@@ -163,7 +159,7 @@ void render_thread_fn(std::stop_token token, DrawContext &ctx) {
 int main(int argc, const char **argv) {
 #ifdef __SWITCH__
     if (argc < 2)
-        argc = 2, argv[1] = "/Videos/akira60.mp4";
+        argc = 2, argv[1] = "/Videos/4k60.mkv";
 #endif
 
     if (auto rc = appletLockExit(); R_FAILED(rc))
@@ -172,7 +168,7 @@ int main(int argc, const char **argv) {
     std::printf("Starting player\n");
 
     dk::UniqueDevice dk = dk::DeviceMaker()
-        .setFlags(DkDeviceFlags_OriginLowerLeft)
+        .setFlags(DkDeviceFlags_OriginUpperLeft)
         .create();
 
     dk::UniqueQueue present_queue = dk::QueueMaker(dk)
@@ -299,8 +295,6 @@ done:
 
     mpv_render_context_free(mpv_gl);
     mpv_destroy(mpv);
-
-    present_queue.waitIdle();
 
     appletUnlockExit();
 
