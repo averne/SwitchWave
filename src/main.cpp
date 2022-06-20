@@ -200,8 +200,8 @@ int main(int argc, const char **argv) {
     mpv_set_option_string(mpv, "framedrop", "decoder+vo");
     mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
     mpv_set_option_string(mpv, "vd-lavc-threads", "4");
-    mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "nonkey");
-    mpv_set_option_string(mpv, "vd-lavc-skipframe", "nonref");
+    mpv_set_option_string(mpv, "vd-lavc-skiploopfilter", "all");
+    mpv_set_option_string(mpv, "vd-lavc-skipframe", "default");
     mpv_set_option_string(mpv, "vd-lavc-framedrop", "nonref");
     mpv_set_option_string(mpv, "vd-lavc-fast", "yes");
 
