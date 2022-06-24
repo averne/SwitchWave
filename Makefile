@@ -18,7 +18,8 @@ APP_AUTHOR              :=  averne
 APP_ICON                :=
 APP_VERSION             :=
 
-FFMPEG_CONFIG           :=  --enable-network \
+FFMPEG_CONFIG           :=  --enable-asm \
+						    --enable-network \
                             --enable-gpl \
                             --enable-tx1 \
                             --enable-static --disable-shared \
@@ -33,19 +34,23 @@ ifeq ($(strip $(HOST)),hos)
 PACKAGES                +=  uam
 
 FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
-                            --cross-prefix=aarch64-none-elf- --arch=aarch64 --enable-pic \
-							--disable-autodetect --disable-runtime-cpudetect --disable-debug
+                            --cross-prefix=aarch64-none-elf- --arch=aarch64 --cpu=cortex-a57 --enable-neon \
+							--enable-pic --disable-autodetect --disable-runtime-cpudetect --disable-debug
 MPV_CONFIG              +=  --disable-sdl2 --disable-gl --disable-plain-gl --enable-hos-audio --enable-deko3d
 
 DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L
 ARCH                    :=  -march=armv8-a+crc+crypto+simd -mtune=cortex-a57 -mtp=soft -fpie
-FLAGS                   :=  -O0 -g -Wall -Wextra -pipe -ffunction-sections -fdata-sections
+FLAGS                   :=  -O2 -g -Wall -Wextra -pipe -ffunction-sections -fdata-sections \
+                            -Wno-unused-parameter -Wno-missing-field-initializers
 CFLAGS                  :=  -std=gnu11
-CXXFLAGS                :=  -std=gnu++20 -fno-rtti -fno-exceptions
+CXXFLAGS                :=  -std=gnu++20
 ASFLAGS                 :=
 LDFLAGS                 :=  -g -Wl,--gc-sections -Wl,-pie -specs=$(DEVKITPRO)/libnx/switch.specs
 LINKS                   :=  -lnx
 PREFIX                  :=  aarch64-none-elf-
+
+BOREALIS_PATH           :=  borealis
+include $(TOPDIR)/borealis/library/borealis.mk
 
 else ifeq ($(strip $(HOST)),linux)
 
@@ -100,9 +105,9 @@ NACP_TARGET             :=  $(OUTPUT:.nro=.nacp)
 else
 OUTPUT                  :=  $(ELF_TARGET)
 endif
-CFILES                  :=  $(shell find $(SOURCES) -name '*.c')
-CPPFILES                :=  $(shell find $(SOURCES) -name '*.cpp')
-SFILES                  :=  $(shell find $(SOURCES) -name '*.s' -or -name '*.S')
+CFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.c')
+CPPFILES                :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.cpp')
+SFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.s' -or -name '*.S')
 
 OFILES                  :=  $(CFILES:%=$(BUILD)/%.o) $(CPPFILES:%=$(BUILD)/%.o) $(SFILES:%=$(BUILD)/%.o)
 DFILES                  :=  $(OFILES:.o=.d)
