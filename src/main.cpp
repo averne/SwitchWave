@@ -249,6 +249,7 @@ int main(int argc, const char **argv) {
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
 
+    std::int64_t vo_dropped = 0, dec_dropped = 0;
     while (appletMainLoop()) {
         mpv_event *mp_event = mpv_wait_event(mpv, 0.1);
         switch (mp_event->event_id) {
@@ -260,9 +261,20 @@ int main(int argc, const char **argv) {
                 break;
             case MPV_EVENT_NONE:
                 break;
+            case MPV_EVENT_END_FILE:
+                goto done;
             default:
                 std::printf("[event]: %s\n", mpv_event_name(mp_event->event_id));
                 break;
+        }
+
+        std::int64_t new_vo_dropped, new_dec_dropped;
+        mpv_get_property(mpv, "frame-drop-count", MPV_FORMAT_INT64, &new_vo_dropped);
+        mpv_get_property(mpv, "decoder-frame-drop-count", MPV_FORMAT_INT64, &new_dec_dropped);
+
+        if ((new_vo_dropped != vo_dropped) || (new_dec_dropped != dec_dropped)) {
+            vo_dropped = new_vo_dropped, dec_dropped = new_dec_dropped;
+            std::printf("Dropped frames: VO %ld, DEC %ld\n", vo_dropped, dec_dropped);
         }
 
         padUpdate(&pad);
@@ -287,6 +299,11 @@ int main(int argc, const char **argv) {
             mpv_command_async(mpv, 0, cmd_);
         }
 
+        if (padGetButtonsDown(&pad) & (HidNpadButton_ZR | HidNpadButton_ZL)) {
+            const char *time = (padGetButtonsDown(&pad) & HidNpadButton_ZR) ? "+60" : "-60";
+            const char *cmd_[] = {"seek", time, "relative", NULL};
+            mpv_command_async(mpv, 0, cmd_);
+        }
     }
 
 done:
