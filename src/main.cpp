@@ -196,7 +196,7 @@ int main(int argc, const char **argv) {
         die("mpv init failed");
 
     mpv_set_option_string(mpv, "hwdec", "auto");
-    mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video,mpeg4,h264,vp8,vp9");
+    mpv_set_option_string(mpv, "hwdec-codecs", "mpeg1video,mpeg2video,mpeg4,vc1,wmv3,h264,hevc,vp8,vp9");
     mpv_set_option_string(mpv, "framedrop", "decoder+vo");
     mpv_set_option_string(mpv, "vd-lavc-dr", "yes");
     mpv_set_option_string(mpv, "vd-lavc-threads", "4");
