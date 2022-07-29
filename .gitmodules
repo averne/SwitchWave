@@ -8,6 +8,3 @@
 [submodule "libuam"]
 	path = libuam
 	url = git@github.com:averne/libuam.git
-[submodule "borealis"]
-	path = borealis
-	url = https://github.com/averne/borealis.git

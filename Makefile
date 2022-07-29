@@ -7,7 +7,7 @@ TOPDIR                  ?=  $(CURDIR)
 TARGET                  :=  AmpNX
 INCLUDES                :=  include
 SOURCES                 :=  src
-ROMFS                   :=
+ROMFS                   :=  assets
 BUILD                   :=  build-$(HOST)
 INSTALL                 :=  $(TOPDIR)/build-$(HOST)/install
 PACKAGES                :=  mpv libavcodec libavdevice libavformat libavfilter libavutil libswscale libswresample
@@ -48,9 +48,6 @@ ASFLAGS                 :=
 LDFLAGS                 :=  -g -Wl,--gc-sections -Wl,-pie -specs=$(DEVKITPRO)/libnx/switch.specs
 LINKS                   :=  -lnx
 PREFIX                  :=  aarch64-none-elf-
-
-BOREALIS_PATH           :=  borealis
-include $(TOPDIR)/borealis/library/borealis.mk
 
 else ifeq ($(strip $(HOST)),linux)
 
@@ -105,9 +102,9 @@ NACP_TARGET             :=  $(OUTPUT:.nro=.nacp)
 else
 OUTPUT                  :=  $(ELF_TARGET)
 endif
-CFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.c')
-CPPFILES                :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.cpp')
-SFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.s' -or -name '*.S')
+CFILES                  :=  $(shell find $(SOURCES) -name '*.c')
+CPPFILES                :=  $(shell find $(SOURCES) -name '*.cpp')
+SFILES                  :=  $(shell find $(SOURCES) -name '*.s' -or -name '*.S')
 
 OFILES                  :=  $(CFILES:%=$(BUILD)/%.o) $(CPPFILES:%=$(BUILD)/%.o) $(SFILES:%=$(BUILD)/%.o)
 DFILES                  :=  $(OFILES:.o=.d)

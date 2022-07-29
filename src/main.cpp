@@ -50,6 +50,15 @@ namespace {
 AppletHookCookie applet_hook_cookie;
 #endif
 
+extern "C" void userAppInit() {
+    socketInitializeDefault();
+    nxlinkStdio();
+}
+
+extern "C" void userAppExit() {
+    socketExit();
+}
+
 } // namespace
 
 #ifdef __SWITCH__
