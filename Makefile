@@ -102,9 +102,9 @@ NACP_TARGET             :=  $(OUTPUT:.nro=.nacp)
 else
 OUTPUT                  :=  $(ELF_TARGET)
 endif
-CFILES                  :=  $(shell find $(SOURCES) -name '*.c')
-CPPFILES                :=  $(shell find $(SOURCES) -name '*.cpp')
-SFILES                  :=  $(shell find $(SOURCES) -name '*.s' -or -name '*.S')
+CFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.c')
+CPPFILES                :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.cpp')
+SFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.s' -or -name '*.S')
 
 OFILES                  :=  $(CFILES:%=$(BUILD)/%.o) $(CPPFILES:%=$(BUILD)/%.o) $(SFILES:%=$(BUILD)/%.o)
 DFILES                  :=  $(OFILES:.o=.d)
