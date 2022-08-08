@@ -5,8 +5,9 @@ endif
 TOPDIR                  ?=  $(CURDIR)
 
 TARGET                  :=  AmpNX
-INCLUDES                :=  include
-SOURCES                 :=  src
+INCLUDES                :=  include src/imgui src/implot
+SOURCES                 :=  src src/imgui src/implot
+SHADERS                 :=  src/shaders
 ROMFS                   :=  assets
 BUILD                   :=  build-$(HOST)
 INSTALL                 :=  $(TOPDIR)/build-$(HOST)/install
@@ -16,7 +17,7 @@ LIBDIRS                 :=  $(INSTALL)
 APP_TITLE               :=  AmpNX
 APP_AUTHOR              :=  averne
 APP_ICON                :=
-APP_VERSION             :=
+APP_VERSION             :=  0.0.0
 
 FFMPEG_CONFIG           :=  --enable-asm \
 						    --enable-network \
@@ -31,6 +32,7 @@ MPV_CONFIG              :=  --enable-libmpv-static --disable-libmpv-shared \
 
 ifeq ($(strip $(HOST)),hos)
 
+SOURCES                 +=  src/imgui_impl_hos
 PACKAGES                +=  uam
 
 FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
@@ -38,7 +40,7 @@ FFMPEG_CONFIG           +=  --target-os=horizon --enable-cross-compile \
 							--enable-pic --disable-autodetect --disable-runtime-cpudetect --disable-debug
 MPV_CONFIG              +=  --disable-sdl2 --disable-gl --disable-plain-gl --enable-hos-audio --enable-deko3d
 
-DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L
+DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L timegm=mktime
 ARCH                    :=  -march=armv8-a+crc+crypto+simd -mtune=cortex-a57 -mtp=soft -fpie
 FLAGS                   :=  -O2 -g -Wall -Wextra -pipe -ffunction-sections -fdata-sections \
                             -Wno-unused-parameter -Wno-missing-field-initializers
@@ -51,6 +53,8 @@ PREFIX                  :=  aarch64-none-elf-
 
 else ifeq ($(strip $(HOST)),linux)
 
+SOURCES                 +=  src/imgui/backends/imgui_impl_sdl.cpp src/imgui/backends/imgui_impl_opengl3.cpp
+PACKAGES                +=  sdl2
 FFMPEG_CONFIG           +=  --disable-optimizations --disable-small
 
 DEFINES                 :=
@@ -105,9 +109,11 @@ endif
 CFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.c')
 CPPFILES                :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.cpp')
 SFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.s' -or -name '*.S')
+GLSLFILES               :=  $(notdir $(shell find $(SHADERS) -maxdepth 1 -name '*.glsl'))
 
 OFILES                  :=  $(CFILES:%=$(BUILD)/%.o) $(CPPFILES:%=$(BUILD)/%.o) $(SFILES:%=$(BUILD)/%.o)
 DFILES                  :=  $(OFILES:.o=.d)
+DKSHFILES               :=  $(GLSLFILES:%.glsl=$(ROMFS)/shaders/%.dksh)
 
 DEFINES_FLAGS           :=  $(addprefix -D,$(DEFINES))
 INCLUDE_FLAGS           :=  $(addprefix -I,$(INCLUDES)) $(foreach dir,$(LIBDIRS),-I$(dir)/include)
@@ -201,7 +207,7 @@ build-mpv:
 build-uam:
 	@meson install -C $(BUILD)/libuam
 
-%.nro: % $(ROMFS_TARGET) $(APP_ICON) $(NACP_TARGET)
+%.nro: % $(ROMFS_TARGET) $(DKSHFILES) $(APP_ICON) $(NACP_TARGET)
 	@echo "NRO     " $@
 	@mkdir -p $(dir $@)
 	@elf2nro $(ELF_TARGET) $@ $(NROFLAGS) > /dev/null
@@ -232,6 +238,16 @@ $(BUILD)/%.s.o: %.s %.S
 	@echo "AS      " $@
 	@mkdir -p $(dir $@)
 	@$(AS) -MMD -MP -x assembler-with-cpp $(ARCH) $(RELEASE_FLAGS) $(RELEASE_ASFLAGS) $(INCLUDE_FLAGS) -c $(CURDIR)/$< -o $@
+
+$(ROMFS)/shaders/%_vsh.dksh: $(SHADERS)/%_vsh.glsl
+	@echo "VERT    " $@
+	@mkdir -p $(dir $@)
+	@uam -s vert -o $@ $<
+
+$(ROMFS)/shaders/%_fsh.dksh: $(SHADERS)/%_fsh.glsl
+	@echo "FRAG    " $@
+	@mkdir -p $(dir $@)
+	@uam -s frag -o $@ $<
 
 clean:
 	@echo Cleaning...
