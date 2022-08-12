@@ -4,7 +4,9 @@ A hardware-accelerated media player for the Nintendo Switch, built on mpv and FF
 ## Features
 - Custom hardware acceleration backend for FFmpeg for the following codecs:
     - MPEG1/2/4
+    - VC1
     - H.264/AVC (10+ bit not supported by hardware)
+    - H.265/HEVC (12+ bit not supported by hardware)
     - VP8
     - VP9 (10+ bit not supported by hardware)
 - Custom graphics backend for mpv using deko3d, supporting:
@@ -13,7 +15,7 @@ A hardware-accelerated media player for the Nintendo Switch, built on mpv and FF
     - Custom post-processing shaders
 - Custom audio backend for mpv using native Nintendo APIs
 <!-- Network stuff -->
-<!-- Native-looking UI using borealis -->
+<!-- UI stuff -->
 
 ## Screenshots
 

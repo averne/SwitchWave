@@ -16,17 +16,32 @@ namespace ampnx {
 
 class Renderer {
     public:
-        constexpr static auto NumSwapchainImages = 2;
+        constexpr static auto NumSwapchainImages = 3;
         constexpr static auto NumLibMpvImages    = 3;
-        constexpr static auto CmdBufSize = 0x4000;
+        constexpr static auto CmdBufSize         = 0x4000;
+        constexpr static auto MaxNumDescriptors  = 64;
+
+    public:
+        struct Texture {
+            dk::Image image;
+            dk::UniqueMemBlock memblock;
+            DkResHandle handle = -1;
+        };
 
     public:
         ~Renderer();
 
         int initialize(LibmpvController &mpv);
 
+        Texture load_texture(std::string_view path, int width, int height,
+            DkImageFormat format, std::uint32_t flags = 0);
+
         void begin_frame();
         void end_frame();
+
+        void wait_idle() {
+            this->queue.waitIdle();
+        }
 
     private:
         void mpv_render_thread_fn(std::stop_token token);
@@ -36,8 +51,10 @@ class Renderer {
         static void applet_hook_cb(AppletHookType hook, void *param);
 #endif
 
-    private:
+    public:
         std::uint32_t image_width = 1280, image_height = 720;
+
+    private:
 
         mpv_render_context *mpv_gl;
 
@@ -54,6 +71,7 @@ class Renderer {
         dk::UniqueMemBlock     descriptor_memblock;
         dk::SamplerDescriptor *sampler_descs;
         dk::ImageDescriptor   *image_descs;
+        int num_descriptors = 0;
 
         dk::UniqueSwapchain swapchain;
         std::atomic_bool    need_swapchain_rebuild = true;

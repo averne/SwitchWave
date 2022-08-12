@@ -2,7 +2,7 @@
 // - RFC  959 (https://tools.ietf.org/html/rfc959)
 // - RFC 3659 (https://tools.ietf.org/html/rfc3659)
 // - suggested implementation details from https://cr.yp.to/ftp/filesystem.html
-// 
+//
 // The MIT License (MIT)
 //
 // Copyright (C) 2020 Michael Theall
@@ -36,12 +36,12 @@ layout (location = 1) out vec4 vtxColor;
 
 layout (std140, binding = 0) uniform VertUBO
 {
-	mat4 projMtx;
+mat4 projMtx;
 } ubo;
 
 void main()
 {
-	gl_Position = ubo.projMtx * vec4 (inPos, 0.0, 1.0);
-	vtxUv       = inUv;
-	vtxColor    = inColor;
+gl_Position = ubo.projMtx * vec4 (inPos, 0.0, 1.0);
+vtxUv       = inUv;
+vtxColor    = inColor;
 }

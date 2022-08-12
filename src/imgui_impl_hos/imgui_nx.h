@@ -30,7 +30,7 @@
 #ifndef CLASSIC
 #include <switch.h>
 
-namespace imgui
+namespace ImGui
 {
 namespace nx
 {

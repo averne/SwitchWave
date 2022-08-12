@@ -6,9 +6,10 @@ TOPDIR                  ?=  $(CURDIR)
 
 TARGET                  :=  AmpNX
 INCLUDES                :=  include src/imgui src/implot
-SOURCES                 :=  src src/imgui src/implot
+SOURCES                 :=  src src/ui src/imgui src/implot
 SHADERS                 :=  src/shaders
-ROMFS                   :=  assets
+TEXTURES                :=  assets/textures
+ROMFS                   :=  build-$(HOST)/romfs
 BUILD                   :=  build-$(HOST)
 INSTALL                 :=  $(TOPDIR)/build-$(HOST)/install
 PACKAGES                :=  mpv libavcodec libavdevice libavformat libavfilter libavutil libswscale libswresample
@@ -110,10 +111,12 @@ CFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.c')
 CPPFILES                :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.cpp')
 SFILES                  :=  $(shell find $(SOURCES) -maxdepth 1 -name '*.s' -or -name '*.S')
 GLSLFILES               :=  $(notdir $(shell find $(SHADERS) -maxdepth 1 -name '*.glsl'))
+SVGFILES                :=  $(notdir $(shell find $(TEXTURES) -maxdepth 1 -name '*.svg'))
 
 OFILES                  :=  $(CFILES:%=$(BUILD)/%.o) $(CPPFILES:%=$(BUILD)/%.o) $(SFILES:%=$(BUILD)/%.o)
 DFILES                  :=  $(OFILES:.o=.d)
 DKSHFILES               :=  $(GLSLFILES:%.glsl=$(ROMFS)/shaders/%.dksh)
+BCFILES                 :=  $(SVGFILES:%.svg=$(ROMFS)/textures/%.bc)
 
 DEFINES_FLAGS           :=  $(addprefix -D,$(DEFINES))
 INCLUDE_FLAGS           :=  $(addprefix -I,$(INCLUDES)) $(foreach dir,$(LIBDIRS),-I$(dir)/include)
@@ -157,7 +160,7 @@ NROFLAGS                :=  --icon=$(strip $(APP_ICON)) --nacp=$(strip $(NACP_TA
 
 ifneq ($(ROMFS),)
     NROFLAGS            +=  --romfsdir=$(strip $(ROMFS))
-    ROMFS_TARGET        +=  $(shell find $(ROMFS) -type 'f')
+    ROMFS_TARGET        :=  $(shell find $(ROMFS) -type 'f') $(DKSHFILES) $(BCFILES)
 endif
 
 # -----------------------------------------------
@@ -207,7 +210,7 @@ build-mpv:
 build-uam:
 	@meson install -C $(BUILD)/libuam
 
-%.nro: % $(ROMFS_TARGET) $(DKSHFILES) $(APP_ICON) $(NACP_TARGET)
+%.nro: % $(ROMFS_TARGET) $(DKSHFILES) $(BCFILES) $(APP_ICON) $(NACP_TARGET)
 	@echo "NRO     " $@
 	@mkdir -p $(dir $@)
 	@elf2nro $(ELF_TARGET) $@ $(NROFLAGS) > /dev/null
@@ -248,6 +251,11 @@ $(ROMFS)/shaders/%_fsh.dksh: $(SHADERS)/%_fsh.glsl
 	@echo "FRAG    " $@
 	@mkdir -p $(dir $@)
 	@uam -s frag -o $@ $<
+
+$(ROMFS)/textures/%.bc: $(TEXTURES)/%.svg
+	@echo "BCn     " $@
+	@mkdir -p $(dir $@)
+	@misc/gimp-bcn-convert.sh $< $@ > /dev/null 2>&1
 
 clean:
 	@echo Cleaning...

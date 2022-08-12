@@ -1,5 +1,10 @@
+#include <cstdio>
+#include <vector>
+
 #include "imgui/imgui.h"
 #include "imgui_impl_hos/imgui_deko3d.h"
+
+#include "utils.hpp"
 
 #include "render.hpp"
 
@@ -12,6 +17,7 @@ void Renderer::applet_hook_cb(AppletHookType hook, void *param) {
     switch (hook) {
         case AppletHookType_OnOperationMode:
             self->need_swapchain_rebuild = true;
+            break;
         default:
             break;
     }
@@ -130,17 +136,20 @@ int Renderer::initialize(LibmpvController &mpv) {
 
     cmdbuf.addMemory(this->cmdbuf_memblock, 0, Renderer::CmdBufSize);
 
-    this->descriptor_memblock = dk::MemBlockMaker(this->dk, 0x1000)
+    this->descriptor_memblock = dk::MemBlockMaker(this->dk,
+            utils::align_up(Renderer::MaxNumDescriptors * (sizeof(dk::SamplerDescriptor) + sizeof(dk::ImageDescriptor)),
+                DK_MEMBLOCK_ALIGNMENT))
         .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached)
         .create();
     if (!this->descriptor_memblock)
         return -1;
 
     this->sampler_descs = static_cast<dk::SamplerDescriptor *>(this->descriptor_memblock.getCpuAddr());
-    this->image_descs   = reinterpret_cast<dk::ImageDescriptor *>(this->sampler_descs + 64);
+    this->image_descs   = reinterpret_cast<dk::ImageDescriptor *>(this->sampler_descs + Renderer::MaxNumDescriptors);
 
-	this->cmdbuf.bindSamplerDescriptorSet(this->descriptor_memblock.getGpuAddr(), 1);
-	this->cmdbuf.bindImageDescriptorSet(this->descriptor_memblock.getGpuAddr() + 64 * sizeof(dk::SamplerDescriptor), 1);
+    this->cmdbuf.bindSamplerDescriptorSet(this->descriptor_memblock.getGpuAddr(), Renderer::MaxNumDescriptors);
+    this->cmdbuf.bindImageDescriptorSet(this->descriptor_memblock.getGpuAddr() + 64 * sizeof(dk::SamplerDescriptor),
+        Renderer::MaxNumDescriptors);
     this->cmdbuf.barrier(DkBarrier_None, DkInvalidateFlags_Descriptors);
     this->queue.submitCommands(this->cmdbuf.finishList());
     this->queue.waitIdle();
@@ -173,9 +182,10 @@ int Renderer::initialize(LibmpvController &mpv) {
 
     appletHook(&this->applet_hook_cookie, applet_hook_cb, this);
 
-    imgui::deko3d::init(this->dk, this->queue, this->cmdbuf,
+    ImGui::deko3d::init(this->dk, this->queue, this->cmdbuf,
         this->sampler_descs[0], this->image_descs[0],
         dkMakeTextureHandle(0, 0), Renderer::NumSwapchainImages);
+    this->num_descriptors++;
 
     this->mpv_render_thread = std::jthread(&Renderer::mpv_render_thread_fn, this);
 
@@ -192,9 +202,57 @@ Renderer::~Renderer() {
     this->swapchain.destroy();
     this->queue.destroy();
 
-    imgui::deko3d::exit();
+    ImGui::deko3d::exit();
 
     mpv_render_context_free(this->mpv_gl);
+}
+
+Renderer::Texture Renderer::load_texture(std::string_view path, int width, int height,
+        DkImageFormat format, std::uint32_t flags) {
+    auto *fp = fopen(path.data(), "rb");
+    fseek(fp, 0, SEEK_END);
+    auto fsize = ftell(fp);
+    rewind(fp);
+
+    dk::UniqueMemBlock transfer = dk::MemBlockMaker(this->dk, utils::align_up(fsize, DK_MEMBLOCK_ALIGNMENT))
+        .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached)
+        .create();
+
+    if (fread(transfer.getCpuAddr(), fsize, 1, fp) != 1)
+        return {};
+
+    dk::ImageLayout layout;
+    dk::ImageLayoutMaker(this->dk)
+        .setFlags(flags)
+        .setFormat(format)
+        .setDimensions(width, height)
+        .initialize(layout);
+
+    auto out_memblock = dk::MemBlockMaker(this->dk,
+            utils::align_up(layout.getSize(), std::max(layout.getAlignment(), std::uint32_t(DK_MEMBLOCK_ALIGNMENT))))
+        .setFlags(DkMemBlockFlags_CpuUncached | DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image)
+        .create();
+
+    dk::Image out_image;
+    out_image.initialize(layout, out_memblock, 0);
+
+    auto out_view = dk::ImageView(out_image);
+    auto sampler = dk::Sampler()
+            .setFilter(DkFilter_Linear, DkFilter_Linear)
+            .setWrapMode(DkWrapMode_ClampToEdge, DkWrapMode_ClampToEdge, DkWrapMode_ClampToEdge);
+
+    this->num_descriptors++;
+    this->sampler_descs[this->num_descriptors].initialize(sampler);
+    this->image_descs  [this->num_descriptors].initialize(out_view);
+    auto out_handle = dkMakeTextureHandle(this->num_descriptors, this->num_descriptors);
+
+    this->cmdbuf.copyBufferToImage(DkCopyBuf{transfer.getGpuAddr()}, out_view,
+        DkImageRect{0, 0, 0, std::uint32_t(width), std::uint32_t(height), 1});
+    this->cmdbuf.barrier(DkBarrier_None, DkInvalidateFlags_Descriptors);
+    this->queue.submitCommands(this->cmdbuf.finishList());
+    this->queue.waitIdle();
+
+    return Texture(out_image, std::move(out_memblock), out_handle);
 }
 
 void Renderer::begin_frame() {
@@ -218,19 +276,19 @@ void Renderer::end_frame() {
     this->cmdbuf.bindRenderTargets(&dst_view);
     this->cmdbuf.setScissors(0, DkScissor{0, 0, this->image_width, this->image_height});
 
-    int libmpv_slot = this->cur_libmpv_image.load();
+    auto libmpv_slot = this->cur_libmpv_image.load();
     if (libmpv_slot >= 0) {
         auto src_view = dk::ImageView(this->mpv_images[libmpv_slot]);
         this->cmdbuf.blitImage(src_view, DkImageRect{0, 0, 0, this->image_width, this->image_height, 1},
             dst_view, DkImageRect{0, 0, 0, this->image_width, this->image_height, 1}, DkBlitFlag_ModeBlit, 0);
         this->cmdbuf.signalFence(this->mpv_copy_fences[libmpv_slot]);
     } else {
-        this->cmdbuf.clearColor(0, DkColorMask_RGBA, 0.0f, 0.0f, 0.0f);
+        this->cmdbuf.clearColor(0, DkColorMask_RGBA, 0, 0, 0);
     }
 
     this->queue.submitCommands(this->cmdbuf.finishList());
 
-    imgui::deko3d::render(this->dk, this->queue, this->cmdbuf, slot);
+    ImGui::deko3d::render(this->dk, this->queue, this->cmdbuf, slot);
 
     this->queue.presentImage(this->swapchain, slot);
     mpv_render_context_report_swap(this->mpv_gl);
