@@ -36,12 +36,12 @@ layout (location = 1) out vec4 vtxColor;
 
 layout (std140, binding = 0) uniform VertUBO
 {
-mat4 projMtx;
+    mat4 projMtx;
 } ubo;
 
 void main()
 {
-gl_Position = ubo.projMtx * vec4 (inPos, 0.0, 1.0);
-vtxUv       = inUv;
-vtxColor    = inColor;
+    gl_Position = ubo.projMtx * vec4 (inPos, 0.0, 1.0);
+    vtxUv       = inUv;
+    vtxColor    = inColor;
 }

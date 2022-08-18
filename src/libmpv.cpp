@@ -27,9 +27,6 @@ int LibmpvController::initialize() {
     MPV_CALL(mpv_set_option_string(this->mpv, "vd-lavc-skipframe", "default"));
     MPV_CALL(mpv_set_option_string(this->mpv, "vd-lavc-framedrop", "nonref"));
     MPV_CALL(mpv_set_option_string(this->mpv, "vd-lavc-fast", "yes"));
-    // MPV_CALL(mpv_set_option_string(this->mpv, "cache", "yes"));
-    // MPV_CALL(mpv_set_option_string(this->mpv, "fbo-format", "rgba8"));
-    // MPV_CALL(mpv_set_option_string(this->mpv, "hdr-compute-peak", "no"));
 
     return 0;
 }
@@ -73,6 +70,14 @@ void LibmpvController::process_events() {
                             this->async_properties.erase(it);
                     }
                 }
+                break;
+            case MPV_EVENT_SET_PROPERTY_REPLY:
+                {
+                    if (event->error)
+                        printf("Got error reply for set async property: %d\n", event->error);
+                    // auto *prop = static_cast<mpv_event_property *>(event->data);
+                }
+                break;
             default:
                 break;
         }

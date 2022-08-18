@@ -68,6 +68,24 @@ class LibmpvController {
             PropertyCallback callback = nullptr, void *user = nullptr);
 
         template <typename T>
+        int set_property(std::string_view name, T val) {
+            return this->set_property(name, LibmpvController::to_mpv_format<T>(), &val);
+        }
+
+        int set_property(std::string_view name, mpv_format fmt, void *val) {
+            return mpv_set_property(this->mpv, name.data(), fmt, val);
+        }
+
+        template <typename T>
+        int set_property_async(std::string_view name, T val) {
+            return this->set_property_async(name, LibmpvController::to_mpv_format<T>(), &val);
+        }
+
+        int set_property_async(std::string_view name, mpv_format fmt, void *val) {
+            return mpv_set_property_async(this->mpv, 0, name.data(), fmt, val);
+        }
+
+        template <typename T>
         int observe_property(std::string_view name, T *res = nullptr, PropertyCallback callback = nullptr, void *user = nullptr) {
             return this->observe_property(name, LibmpvController::to_mpv_format<T>(), res, callback);
         }
@@ -99,16 +117,16 @@ class LibmpvController {
     private:
         template <typename T>
         static constexpr mpv_format to_mpv_format() {
-            using NoPtr = std::remove_pointer_t<std::remove_pointer_t<T>>;
-            if constexpr (std::is_same_v<NoPtr, int>)
+            using Decayed = std::decay_t<T>;
+            if constexpr (std::is_same_v<Decayed, int>)
                 return MPV_FORMAT_FLAG;
-            else if constexpr (std::is_same_v<NoPtr, std::int64_t>)
+            else if constexpr (std::is_same_v<Decayed, std::int64_t>)
                 return MPV_FORMAT_INT64;
-            else if constexpr (std::is_same_v<NoPtr, double>)
+            else if constexpr (std::is_same_v<Decayed, double>)
                 return MPV_FORMAT_DOUBLE;
-            else if constexpr (std::is_same_v<NoPtr, char *>)
+            else if constexpr (std::is_same_v<Decayed, const char *> || std::is_same_v<Decayed, char *>)
                 return MPV_FORMAT_STRING;
-            else if constexpr (std::is_same_v<NoPtr, mpv_node>)
+            else if constexpr (std::is_same_v<Decayed, mpv_node>)
                 return MPV_FORMAT_NODE;
             else
                 return MPV_FORMAT_NONE;
@@ -128,6 +146,8 @@ class LibmpvController {
         LogCallback log_callback = nullptr;
         void *log_callback_user  = nullptr;
 
+        // TODO: Try using std::list for these and pass ptrs to reply_userdata
+        // TODO: Track set_property_async replies?
         std::unordered_map<std::string_view, TrackedProperty> async_properties;
         std::unordered_map<std::string_view, TrackedProperty> observed_properties;
 };

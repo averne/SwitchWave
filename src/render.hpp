@@ -18,7 +18,7 @@ class Renderer {
     public:
         constexpr static auto NumSwapchainImages = 3;
         constexpr static auto NumLibMpvImages    = 3;
-        constexpr static auto CmdBufSize         = 0x4000;
+        constexpr static auto CmdBufSize         = 0x10000;
         constexpr static auto MaxNumDescriptors  = 64;
 
     public:

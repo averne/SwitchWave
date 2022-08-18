@@ -1166,12 +1166,18 @@ void handleAppletHook (AppletHookType const hook_, void *const param_)
             // use handheld mode resolution (720p)
             s_width  = 1280.0f;
             s_height = 720.0f;
+
+            // Reset style (better than trying to scale back)
+            ImGui::GetStyle() = ImGuiStyle();
             break;
 
         case AppletOperationMode_Console:
             // use docked mode resolution (1080p)
             s_width  = 1920.0f;
             s_height = 1080.0f;
+
+            // Scale style
+            ImGui::GetStyle().ScaleAllSizes(1.5);
             break;
         }
         break;
@@ -1225,16 +1231,16 @@ void updateGamepads (PadState const &padState_, ImGuiIO &io_)
         io_.AddKeyEvent (out, !!(keys & in));
 
     // update joystick
-    auto const jsLeft = padGetStickPos (&padState_, 1);
+    auto const jsRight = padGetStickPos (&padState_, 1);
     auto constexpr thumb_dead_zone = 8000;
     auto const analogMapping = {
-        std::make_tuple (std::ref (jsLeft.x), ImGuiKey_GamepadLStickLeft, -thumb_dead_zone, JOYSTICK_MIN),
-        std::make_tuple (std::ref (jsLeft.x), ImGuiKey_GamepadLStickRight, +thumb_dead_zone, JOYSTICK_MAX),
-        std::make_tuple (std::ref (jsLeft.y), ImGuiKey_GamepadLStickUp, +thumb_dead_zone, JOYSTICK_MAX),
-        std::make_tuple (std::ref (jsLeft.y), ImGuiKey_GamepadLStickDown, -thumb_dead_zone, JOYSTICK_MIN),
+        std::make_tuple (std::ref (jsRight.x), ImGuiKey_GamepadLStickLeft,  -thumb_dead_zone, JOYSTICK_MIN),
+        std::make_tuple (std::ref (jsRight.x), ImGuiKey_GamepadLStickRight, +thumb_dead_zone, JOYSTICK_MAX),
+        std::make_tuple (std::ref (jsRight.y), ImGuiKey_GamepadLStickUp,    +thumb_dead_zone, JOYSTICK_MAX),
+        std::make_tuple (std::ref (jsRight.y), ImGuiKey_GamepadLStickDown,  -thumb_dead_zone, JOYSTICK_MIN),
     };
 
-    // read left joystick from primary controller
+    // read right joystick from primary controller
     for (auto const &[in, out, min, max] : analogMapping)
     {
         auto const value = static_cast<float>(in - min) / static_cast<float>(max - min);

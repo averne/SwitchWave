@@ -63,7 +63,7 @@ int main(int argc, const char **argv) {
 
     ampnx::LibmpvController lmpv;
     lmpv.set_log_callback([](void*, mpv_event_log_message *msg) {
-        // std::printf("[%s]: %s", msg->prefix, msg->text);
+        std::printf("[%s]: %s", msg->prefix, msg->text);
     });
     if (lmpv.initialize()) {
         std::printf("Failed to initialize libmpv\n");
@@ -86,9 +86,9 @@ int main(int argc, const char **argv) {
 
     ampnx::PlayerGui player_ui(renderer, lmpv);
 
-    lmpv.observe_property<std::int64_t *>("frame-drop-count", nullptr, +[](void*, mpv_event_property *prop) {
-        // std::printf("VO dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
-    });
+    // lmpv.observe_property<std::int64_t *>("frame-drop-count", nullptr, +[](void*, mpv_event_property *prop) {
+    //     std::printf("VO dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
+    // });
 
     lmpv.load_file(argv[1]);
 
