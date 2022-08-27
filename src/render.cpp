@@ -70,6 +70,8 @@ void Renderer::rebuild_swapchain() {
 }
 
 void Renderer::mpv_render_thread_fn(std::stop_token token) {
+    dk::Fence done_fence, ready_fence;
+
     while (!token.stop_requested()) {
         if (!this->mpv_redraw_count) {
             std::unique_lock lk(this->mpv_redraw_mutex);
@@ -81,31 +83,44 @@ void Renderer::mpv_render_thread_fn(std::stop_token token) {
         if (!(mpv_render_context_update(this->mpv_gl) & MPV_RENDER_UPDATE_FRAME))
             continue;
 
-        std::scoped_lock lk(this->swapchain_rebuild_mtx);
+        {
+            std::scoped_lock lk(this->render_mtx);
 
-        auto next_slot = (this->cur_libmpv_image.load() + 1) % Renderer::NumLibMpvImages;
+            int slot;
+            if (this->mpv_handle_pres) {
+                this->swapchain.acquireImage(slot, ready_fence);
+                done_fence.wait();
+            } else {
+                slot = (this->cur_libmpv_image.load() + 1) % Renderer::NumLibMpvImages;
+            }
 
-        dk::Fence done_fence;
-        mpv_deko3d_fbo fbo = {
-            .tex         = &this->mpv_images[next_slot],
-            .ready_fence = &this->mpv_copy_fences[next_slot],
-            .done_fence  = &done_fence,
-            .w           = static_cast<int>(this->image_width),
-            .h           = static_cast<int>(this->image_height),
-            .format      = DkImageFormat_RGBA8_Unorm,
-        };
+            mpv_deko3d_fbo fbo = {
+                .tex         = this->mpv_handle_pres ? (&this->swapchain_images[slot]) : (&this->mpv_images[slot]),
+                .ready_fence = this->mpv_handle_pres ? (&ready_fence) : (&this->mpv_copy_fences[slot]),
+                .done_fence  = &done_fence,
+                .w           = static_cast<int>(this->image_width),
+                .h           = static_cast<int>(this->image_height),
+                .format      = DkImageFormat_RGBA8_Unorm,
+            };
 
-        mpv_render_param params[] = {
-            {MPV_RENDER_PARAM_DEKO3D_FBO, &fbo},
-            {},
-        };
+            mpv_render_param params[] = {
+                {MPV_RENDER_PARAM_DEKO3D_FBO, &fbo},
+                {},
+            };
 
-        mpv_render_context_render(this->mpv_gl, params);
+            mpv_render_context_render(this->mpv_gl, params);
 
-        // Wait for the rendering to complete
-        done_fence.wait();
+            // Wait for the rendering to complete before presentating
+            if (this->mpv_handle_pres) {
+                this->queue.waitFence(done_fence);
+                this->queue.presentImage(this->swapchain, slot);
+            } else {
+                done_fence.wait();
+                this->cur_libmpv_image = slot;
+            }
 
-        this->cur_libmpv_image = next_slot;
+            mpv_render_context_report_swap(this->mpv_gl);
+        }
     }
 }
 
@@ -257,7 +272,7 @@ Renderer::Texture Renderer::load_texture(std::string_view path, int width, int h
 
 void Renderer::begin_frame() {
     if (this->need_swapchain_rebuild) {
-        std::scoped_lock lk(this->swapchain_rebuild_mtx);
+        std::scoped_lock lk(this->render_mtx);
         this->rebuild_swapchain();
     }
 
@@ -271,6 +286,8 @@ void Renderer::end_frame() {
 
     this->cmdbuf.clear();
     this->cmdbuf.addMemory(this->cmdbuf_memblock, slot * Renderer::CmdBufSize, Renderer::CmdBufSize);
+
+    this->ui_render_fences[slot].wait();
 
     auto dst_view = dk::ImageView(this->swapchain_images[slot]);
     this->cmdbuf.bindRenderTargets(&dst_view);
@@ -290,8 +307,23 @@ void Renderer::end_frame() {
 
     ImGui::deko3d::render(this->dk, this->queue, this->cmdbuf, slot);
 
+    this->queue.signalFence(this->ui_render_fences[slot]);
+
     this->queue.presentImage(this->swapchain, slot);
-    mpv_render_context_report_swap(this->mpv_gl);
+}
+
+void Renderer::clear() {
+    auto slot = this->queue.acquireImage(this->swapchain);
+
+    this->cmdbuf.clear();
+
+    auto dst_view = dk::ImageView(this->swapchain_images[slot]);
+    this->cmdbuf.bindRenderTargets(&dst_view);
+    this->cmdbuf.setScissors(0, DkScissor{0, 0, this->image_width, this->image_height});
+    this->cmdbuf.clearColor(0, DkColorMask_RGBA, 0, 0, 0);
+    this->queue.submitCommands(this->cmdbuf.finishList());
+
+    this->queue.presentImage(this->swapchain, slot);
 }
 
 } // namespace ampnx

@@ -63,7 +63,7 @@ SeekBar::SeekBar(Renderer &renderer, LibmpvController &lmpv): Widget(renderer), 
     this->next_texture      = this->renderer.load_texture("romfs:/textures/next-64*64-bc4.bc",
         64, 64, DkImageFormat_R_BC4_Unorm, DkImageFlags_Usage2DEngine);
 
-    this->lmpv.observe_property("pause",       &this->is_paused);
+    this->lmpv.observe_property("pause",       &this->pause);
     this->lmpv.observe_property("time-pos",    &this->time_pos);
     this->lmpv.observe_property("duration",    &this->duration);
     this->lmpv.observe_property("percent-pos", &this->percent_pos);
@@ -150,15 +150,6 @@ bool SeekBar::update_state(PadState &pad, HidTouchScreenState &touch) {
         this->lmpv.command_async("seek", time, "relative-percent");
     }
 
-    // auto constexpr thumb_dead_zone = 8000;
-
-    // auto const analogMapping = {
-    //     std::make_tuple (std::ref (jsRight.x), ImGuiKey_GamepadLStickLeft,  -thumb_dead_zone, JOYSTICK_MIN),
-    //     std::make_tuple (std::ref (jsRight.x), ImGuiKey_GamepadLStickRight, +thumb_dead_zone, JOYSTICK_MAX),
-    //     std::make_tuple (std::ref (jsRight.y), ImGuiKey_GamepadLStickUp,    +thumb_dead_zone, JOYSTICK_MAX),
-    //     std::make_tuple (std::ref (jsRight.y), ImGuiKey_GamepadLStickDown,  -thumb_dead_zone, JOYSTICK_MIN),
-    // };
-
     return false;
 }
 
@@ -188,7 +179,7 @@ void SeekBar::render() {
     auto window_height = ImGui::GetWindowHeight();
     auto img_size = window_height - 2 * (style.WindowPadding.y + style.FramePadding.y);
     auto img_handle = ImGui::deko3d::makeTextureID(
-        (this->is_paused ? this->play_texture : this->pause_texture).handle, true);
+        (this->pause ? this->play_texture : this->pause_texture).handle, true);
 
     // Workaround, due to how ImGui calculates ImageButton ids internally
     // the button gets deselected when changing the texture
@@ -338,8 +329,24 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
     this->lmpv.observe_property("hwdec-current", &this->hwdec_current);
     this->lmpv.observe_property("hwdec-interop", &this->hwdec_interop);
     this->lmpv.observe_property("avsync", &this->avsync);
-    this->lmpv.observe_property("frame-drop-count", &this->dropped_vo_frames);
-    this->lmpv.observe_property("decoder-frame-drop-count", &this->dropped_dec_frames);
+    this->lmpv.observe_property("frame-drop-count", &this->dropped_vo_frames,
+#ifdef DEBUG
+    [](void*, mpv_event_property *prop) {
+        std::printf("VO  dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
+    }
+#else
+    nullptr
+#endif
+    );
+    this->lmpv.observe_property("decoder-frame-drop-count", &this->dropped_dec_frames,
+#ifdef DEBUG
+    [](void*, mpv_event_property *prop) {
+        std::printf("DEC dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
+    }
+#else
+    nullptr
+#endif
+    );
     this->lmpv.observe_property("video-bitrate", &this->video_bitrate);
     this->lmpv.observe_property("audio-bitrate", &this->audio_bitrate);
     this->lmpv.observe_property("container-fps", &this->container_specified_fps);
@@ -379,7 +386,7 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
         auto *params = node->u.list;
 
         self->audio_format       = LibmpvController::node_map_find<char *>(params, "format")    ?: "";
-        self->audio_layout       = LibmpvController::node_map_find<char *>(params, "hr-channels") ?: "";
+        self->audio_layout       = LibmpvController::node_map_find<char *>(params, "channels") ?: "";
         self->audio_samplerate   = LibmpvController::node_map_find<std::int64_t>(params, "samplerate");
         self->audio_num_channels = LibmpvController::node_map_find<std::int64_t>(params, "channel-count");
 
@@ -719,7 +726,7 @@ void PlayerMenu::render() {
 
         static bool muted = false;
         if (ImGui::Checkbox("Mute", &muted))
-            this->lmpv.set_property_async("mute", int(muted));
+            this->lmpv.set_property_async("ao-mute", int(muted));
 
         ImGui::Separator();
         ImGui::Text("Delay");
@@ -868,8 +875,6 @@ void PlayerMenu::render() {
             ImGuiTabBarFlags_NoTabListScrollingButtons | ImGuiTabBarFlags_NoTooltip);
         AMPNX_SCOPEGUARD([] { ImGui::EndTabBar(); });
 
-        // ImGui::Text("UI: %.1f fps, %d vertices, %d indices", io.Framerate, io.MetricsRenderVertices, io.MetricsRenderIndices);
-
         if (ImGui::BeginTabItem("Media info")) {
             AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
@@ -926,6 +931,19 @@ void PlayerMenu::render() {
 
                 ImPlot::EndPlot();
             }
+        }
+
+        if (ImGui::BeginTabItem("UI")) {
+            AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
+
+            ImGui::SetWindowFontScale(0.7 * float(this->renderer.image_height) / 720.0f);
+            AMPNX_SCOPEGUARD([&] { ImGui::SetWindowFontScale(float(this->renderer.image_height) / 720.0f); });
+
+            auto &io = ImGui::GetIO();
+            ImGui::BulletText("FPS: %.1fHz, frame time %.1fms", io.Framerate, io.DeltaTime * 1000.0f);
+            ImGui::BulletText("Vertices: %d", io.MetricsRenderVertices);
+            ImGui::BulletText("Indices: %d", io.MetricsRenderIndices);
+            ImGui::BulletText("Allocations: %d", io.MetricsActiveAllocations);
         }
     }
 }

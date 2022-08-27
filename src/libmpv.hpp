@@ -24,6 +24,9 @@ class LibmpvController {
         constexpr static auto MpvDirectory = "/switch/AmpNX";
 
     public:
+        LibmpvController(LogCallback callback = nullptr):
+            log_callback(callback) { }
+
         ~LibmpvController();
 
         int initialize();

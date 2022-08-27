@@ -38,6 +38,10 @@ class SeekBar final: public Widget {
             this->visible_start = std::chrono::system_clock::now();
         }
 
+        inline bool is_paused() const {
+            return this->pause;
+        }
+
     public:
         bool is_visible = false;
 
@@ -59,7 +63,7 @@ class SeekBar final: public Widget {
         bool  is_appearing = false;
         float fadeio_alpha = 0.0f;
 
-        int    is_paused   = false;
+        int    pause       = false;
         double time_pos    = 0;
         double duration    = 0;
         double percent_pos = 0;
@@ -146,8 +150,12 @@ class PlayerGui final: public Widget {
         virtual bool update_state(PadState &pad, HidTouchScreenState &touch) override;
         virtual void render() override;
 
-        bool is_visible() const {
+        inline bool is_visible() const {
             return this->seek_bar.is_visible || this->menu.is_visible;
+        }
+
+        inline bool is_paused() const {
+            return this->seek_bar.is_paused();
         }
 
     private:

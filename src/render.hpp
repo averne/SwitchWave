@@ -39,8 +39,23 @@ class Renderer {
         void begin_frame();
         void end_frame();
 
+        void clear();
+
         void wait_idle() {
             this->queue.waitIdle();
+        }
+
+        void switch_presentation_mode(bool mpv_handle_pres) {
+            std::scoped_lock lk(this->render_mtx);
+
+            printf("Switching presentation mode\n");
+            this->queue.waitIdle();
+            this->mpv_handle_pres  = mpv_handle_pres;
+
+            if (!mpv_handle_pres) {
+                this->mpv_copy_fences  = {};
+                this->cur_libmpv_image = -1;
+            }
         }
 
     private:
@@ -55,10 +70,11 @@ class Renderer {
         std::uint32_t image_width = 1280, image_height = 720;
 
     private:
-
         mpv_render_context *mpv_gl;
 
         std::jthread mpv_render_thread;
+        bool         mpv_handle_pres = true;
+        std::mutex   render_mtx;
 
         std::condition_variable mpv_redraw_condvar;
         std::mutex              mpv_redraw_mutex;
@@ -75,13 +91,13 @@ class Renderer {
 
         dk::UniqueSwapchain swapchain;
         std::atomic_bool    need_swapchain_rebuild = true;
-        std::mutex          swapchain_rebuild_mtx;
         AppletHookCookie    applet_hook_cookie;
 
         dk::UniqueMemBlock                        image_memblock;
         std::array<dk::Image, NumSwapchainImages> swapchain_images;
         std::array<dk::Image, NumLibMpvImages>    mpv_images;
-        std::array<dk::Fence, NumLibMpvImages>    mpv_copy_fences;
+        std::array<dk::Fence, NumLibMpvImages>    mpv_copy_fences  = {};
+        std::array<dk::Fence, NumLibMpvImages>    ui_render_fences = {};
         std::atomic_int                           cur_libmpv_image = -1;
 };
 
