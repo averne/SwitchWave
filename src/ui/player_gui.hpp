@@ -113,6 +113,7 @@ class PlayerMenu final: public Widget {
 
         struct PassInfo {
             std::string desc;
+            double average, peak, last;
             std::vector<double> samples;
         };
 

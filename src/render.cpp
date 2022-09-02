@@ -95,8 +95,8 @@ void Renderer::mpv_render_thread_fn(std::stop_token token) {
             }
 
             mpv_deko3d_fbo fbo = {
-                .tex         = this->mpv_handle_pres ? (&this->swapchain_images[slot]) : (&this->mpv_images[slot]),
-                .ready_fence = this->mpv_handle_pres ? (&ready_fence) : (&this->mpv_copy_fences[slot]),
+                .tex         = this->mpv_handle_pres ? &this->swapchain_images[slot] : &this->mpv_images[slot],
+                .ready_fence = this->mpv_handle_pres ? &ready_fence : &this->mpv_copy_fences[slot],
                 .done_fence  = &done_fence,
                 .w           = static_cast<int>(this->image_width),
                 .h           = static_cast<int>(this->image_height),

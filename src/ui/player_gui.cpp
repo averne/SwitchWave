@@ -443,7 +443,12 @@ bool PlayerMenu::update_state(PadState &pad, HidTouchScreenState &touch) {
                 auto *pass = fresh->values[i].u.list;
                 auto *samples = LibmpvController::node_map_find<mpv_node_list *>(pass, "samples");
 
-                auto &info = self->passes_info.emplace_back(LibmpvController::node_map_find<char *>(pass, "desc"));
+                auto &info = self->passes_info.emplace_back(
+                    LibmpvController::node_map_find<char *>(pass, "desc"),
+                    double(LibmpvController::node_map_find<std::int64_t>(pass, "avg"))  / 1.0e6,
+                    double(LibmpvController::node_map_find<std::int64_t>(pass, "peak")) / 1.0e6,
+                    double(LibmpvController::node_map_find<std::int64_t>(pass, "last")) / 1.0e6
+                );
 
                 info.samples.resize(samples->num);
                 std::transform(samples->values, samples->values + samples->num, info.samples.begin(), [](auto &in) {
@@ -913,23 +918,56 @@ void PlayerMenu::render() {
         if (ImGui::BeginTabItem("Passes")) {
             AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
+            static bool is_pie_plot = false;
+            if (ImGui::RadioButton("Graphs",   !is_pie_plot)) { is_pie_plot = false; } ImGui::SameLine();
+            if (ImGui::RadioButton("Pie chart", is_pie_plot)) { is_pie_plot = true;  }
+
+            static auto perf_type = 0;
+            if (is_pie_plot) {
+                if (ImGui::RadioButton("Average", perf_type == 0)) { perf_type = 0; } ImGui::SameLine();
+                if (ImGui::RadioButton("Peak",    perf_type == 1)) { perf_type = 1; } ImGui::SameLine();
+                if (ImGui::RadioButton("Last",    perf_type == 2)) { perf_type = 2; }
+            }
+
             ImGui::SetWindowFontScale(0.5 * float(this->renderer.image_height) / 720.0f);
             AMPNX_SCOPEGUARD([&] { ImGui::SetWindowFontScale(float(this->renderer.image_height) / 720.0f); });
 
-            auto plot_flags = ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs |
-                ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect | ImPlotFlags_AntiAliased;
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetColorU32(ImGuiCol_WindowBg));
+            AMPNX_SCOPEGUARD([] { ImGui::PopStyleColor(); });
 
-            // if (this->passes_info.size() > 20)
-            //     plot_flags |= ImPlotFlags_NoLegend;
+            auto plot_flags = ImPlotFlags_NoMouseText | ImPlotFlags_NoInputs | ImPlotFlags_NoFrame |
+                ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect | ImPlotFlags_AntiAliased |
+                (is_pie_plot ? ImPlotFlags_Equal : 0) /* |
+                (this->passes_info.size() > 20 ? ImPlotFlags_NoLegend : 0) */;
+
+            ImPlot::PushColormap(ImPlotColormap_Dark);
+            AMPNX_SCOPEGUARD([] { ImPlot::PopColormap(); });
 
             if (ImPlot::BeginPlot("Shader passes", ImVec2(-1, -1), plot_flags)) {
-                ImPlot::SetupAxes("", "ms", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                AMPNX_SCOPEGUARD([] { ImPlot::EndPlot(); });
+
+                auto axes_flags = ImPlotAxisFlags_AutoFit |
+                    (is_pie_plot ? ImPlotAxisFlags_NoDecorations : 0);
+
+                ImPlot::SetupAxes("", "ms", axes_flags, axes_flags);
                 ImPlot::SetupLegend(ImPlotLocation_South, ImPlotLegendFlags_Outside);
 
-                for (auto &stats: this->passes_info)
-                    ImPlot::PlotLine(stats.desc.c_str(), stats.samples.data(), stats.samples.size());
+                if (!is_pie_plot) {
+                    for (auto &stats: this->passes_info)
+                        ImPlot::PlotLine(stats.desc.c_str(), stats.samples.data(), stats.samples.size());
+                } else {
+                    auto names    = std::vector<const char *>(this->passes_info.size());
+                    auto averages = std::vector<double>(this->passes_info.size());
 
-                ImPlot::EndPlot();
+                    std::transform(this->passes_info.begin(), this->passes_info.end(), names.begin(),
+                        [](auto &&pass) { return pass.desc.c_str(); });
+
+                    std::transform(this->passes_info.begin(), this->passes_info.end(), averages.begin(),
+                        [](auto &&pass) { return *(&pass.average + perf_type); });
+
+                    ImPlot::PlotPieChart(names.data(), averages.data(), this->passes_info.size(),
+                        0.5, 0.5, 0.4, true, "%.2fms", 0.0);
+                }
             }
         }
 
