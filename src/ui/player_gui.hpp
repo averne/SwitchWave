@@ -130,13 +130,15 @@ class PlayerMenu final: public Widget {
 
         char *file_format = nullptr, *video_codec = nullptr, *audio_codec = nullptr,
             *hwdec_current = nullptr, *hwdec_interop = nullptr;
-        std::string video_pixfmt, video_hw_piwfmt,
+        std::string video_pixfmt, video_hw_piwfmt, video_colorspace, video_color_range, video_gamma,
             audio_format, audio_layout;
         int video_width = 0, video_height = 0, video_width_scaled = 0, video_height_scaled = 0,
             audio_num_channels = 0, audio_samplerate = 0;
         std::int64_t video_bitrate = 0, audio_bitrate = 0;
         double avsync = 0, container_specified_fps = 0, container_estimated_fps = 0;
         std::int64_t dropped_vo_frames = 0, dropped_dec_frames = 0;
+        double demuxer_cache_begin = 0, demuxer_cache_end = 0, demuxer_cache_speed = 0;
+        std::int64_t demuxer_cached_bytes = 0, demuxer_forward_bytes = 0;
 
         // double sub_speed;
 };

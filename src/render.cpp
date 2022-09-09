@@ -253,8 +253,8 @@ Renderer::Texture Renderer::load_texture(std::string_view path, int width, int h
 
     auto out_view = dk::ImageView(out_image);
     auto sampler = dk::Sampler()
-            .setFilter(DkFilter_Linear, DkFilter_Linear)
-            .setWrapMode(DkWrapMode_ClampToEdge, DkWrapMode_ClampToEdge, DkWrapMode_ClampToEdge);
+        .setFilter(DkFilter_Linear, DkFilter_Linear)
+        .setWrapMode(DkWrapMode_ClampToEdge, DkWrapMode_ClampToEdge, DkWrapMode_ClampToEdge);
 
     this->num_descriptors++;
     this->sampler_descs[this->num_descriptors].initialize(sampler);

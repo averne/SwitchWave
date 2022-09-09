@@ -255,7 +255,7 @@ void SeekBar::render() {
             ImGui::GetColorU32({1.0, 1.0, 1.0, 1.0}), SeekBar::SeekBarLinesWidthPx);
     }
 
-    auto pos_y = interior_bb.Max.y - SeekBar::SeekBarLinesWidthPx / 2;
+    auto pos_y = interior_bb.GetCenter().y;
     for (auto &range: this->seekable_ranges) {
         list->AddLine(ImVec2{ts_to_seekbar_pos(range.start), pos_y},
             ImVec2{ts_to_seekbar_pos(range.end), pos_y},
@@ -357,10 +357,13 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
         auto *node   = static_cast<mpv_node *>(prop->data);
         auto *params = node->u.list;
 
-        self->video_pixfmt    = LibmpvController::node_map_find<char *>(params, "pixelformat")    ?: "";
-        self->video_hw_piwfmt = LibmpvController::node_map_find<char *>(params, "hw-pixelformat") ?: "";
-        self->video_width     = LibmpvController::node_map_find<std::int64_t>(params, "w");
-        self->video_height    = LibmpvController::node_map_find<std::int64_t>(params, "h");
+        self->video_width       = LibmpvController::node_map_find<std::int64_t>(params, "w");
+        self->video_height      = LibmpvController::node_map_find<std::int64_t>(params, "h");
+        self->video_pixfmt      = LibmpvController::node_map_find<char *>(params, "pixelformat")    ?: "";
+        self->video_hw_piwfmt   = LibmpvController::node_map_find<char *>(params, "hw-pixelformat") ?: "";
+        self->video_colorspace  = LibmpvController::node_map_find<char *>(params, "colormatrix")    ?: "";
+        self->video_color_range = LibmpvController::node_map_find<char *>(params, "colorlevels")    ?: "";
+        self->video_gamma       = LibmpvController::node_map_find<char *>(params, "gamma")          ?: "";
 
         mpv_free_node_contents(node);
     }, this);
@@ -385,7 +388,7 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
         auto *node   = static_cast<mpv_node *>(prop->data);
         auto *params = node->u.list;
 
-        self->audio_format       = LibmpvController::node_map_find<char *>(params, "format")    ?: "";
+        self->audio_format       = LibmpvController::node_map_find<char *>(params, "format")   ?: "";
         self->audio_layout       = LibmpvController::node_map_find<char *>(params, "channels") ?: "";
         self->audio_samplerate   = LibmpvController::node_map_find<std::int64_t>(params, "samplerate");
         self->audio_num_channels = LibmpvController::node_map_find<std::int64_t>(params, "channel-count");
@@ -456,7 +459,20 @@ bool PlayerMenu::update_state(PadState &pad, HidTouchScreenState &touch) {
                     return double(in.u.int64) / 1.0e6;
                 });
             }
+        }, this);
 
+        this->lmpv.get_property_async("demuxer-cache-state", MPV_FORMAT_NODE, nullptr, +[](void *user, mpv_event_property *prop) {
+            auto *self  = static_cast<PlayerMenu *>(user);
+            auto *node  = static_cast<mpv_node *>(prop->data);
+            auto *state = node->u.list;
+            if (!state)
+                return;
+
+            self->demuxer_cache_begin   = LibmpvController::node_map_find<double>(state, "reader-pts");
+            self->demuxer_cache_end     = LibmpvController::node_map_find<double>(state, "cache-end");
+            self->demuxer_cached_bytes  = LibmpvController::node_map_find<std::int64_t>(state, "total-bytes");
+            self->demuxer_forward_bytes = LibmpvController::node_map_find<std::int64_t>(state, "fw-bytes");
+            self->demuxer_cache_speed   = LibmpvController::node_map_find<std::int64_t>(state, "raw-input-rate");
         }, this);
     }
 
@@ -466,6 +482,8 @@ bool PlayerMenu::update_state(PadState &pad, HidTouchScreenState &touch) {
 void PlayerMenu::render() {
     if (!this->is_visible)
         return;
+
+    auto &io = ImGui::GetIO();
 
     ImGui::Begin("Menu", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoScrollWithMouse);
@@ -718,6 +736,31 @@ void PlayerMenu::render() {
         }
 
         ImGui::Separator();
+        ImGui::Text("Channel mixing");
+
+        constexpr static std::array mix_options = {
+            std::pair{"Auto", "auto"},
+            std::pair{"Stereo", "stereo"},
+            std::pair{"Mono", "fc"},
+        };
+
+        static int current_mix_idx = 0;
+        if (ImGui::BeginCombo("##channelmix", mix_options[current_mix_idx].first)) {
+            AMPNX_SCOPEGUARD([] { ImGui::EndCombo(); });
+
+            for (std::size_t i = 0; i < mix_options.size(); i++) {
+                bool is_selected = std::size_t(current_mix_idx) == i;
+                if (ImGui::Selectable(mix_options[i].first, is_selected)) {
+                    current_mix_idx = i;
+                    this->lmpv.set_property_async("audio-channels", mix_options[current_mix_idx].second);
+                }
+
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+        }
+
+        ImGui::Separator();
         ImGui::Text("Volume");
         static float soft_volume = 100;
         if (ImGui::SliderFloat("##volumeslider", &soft_volume, 0, 150, "%.1f%"))
@@ -744,10 +787,6 @@ void PlayerMenu::render() {
             audio_delay = 0;
             this->lmpv.set_property_async("audio-delay", double(audio_delay));
         }
-
-        // TODO?
-        // ImGui::Separator();
-        // ImGui::Text("Stereo mode");
     }
 
     if (ImGui::BeginTabItem("Subtitles", nullptr, ImGuiTabItemFlags_NoReorder)) {
@@ -880,7 +919,7 @@ void PlayerMenu::render() {
             ImGuiTabBarFlags_NoTabListScrollingButtons | ImGuiTabBarFlags_NoTooltip);
         AMPNX_SCOPEGUARD([] { ImGui::EndTabBar(); });
 
-        if (ImGui::BeginTabItem("Media info")) {
+        if (ImGui::BeginTabItem("Info")) {
             AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
             ImGui::SetWindowFontScale(0.7 * float(this->renderer.image_height) / 720.0f);
@@ -904,6 +943,8 @@ void PlayerMenu::render() {
                     this->video_pixfmt.c_str(), this->video_hw_piwfmt.c_str());
             else
                 bullet_wrapped("Pixel format: %s", this->video_pixfmt.c_str());
+            bullet_wrapped("Colorspace: %s, range: %s, gamma: %s", this->video_colorspace.c_str(),
+                this->video_color_range.c_str(), this->video_gamma.c_str());
             bullet_wrapped("Bitrate: %.1fkbps\n", float(this->video_bitrate) / 1000.0f);
 
             ImGui::Separator();
@@ -913,6 +954,22 @@ void PlayerMenu::render() {
             bullet_wrapped("Format: %s", this->audio_format.c_str());
             bullet_wrapped("Samplerate: %dHz", this->audio_samplerate);
             bullet_wrapped("Bitrate: %.1fkbps\n", float(this->audio_bitrate) / 1000.0f);
+
+            ImGui::Separator();
+            ImGui::Text("Cache");
+            bullet_wrapped("Packet queue: %02u:%02u:%02u‒%02u:%02u:%02u (%02u:%02u:%02u)",
+                FORMAT_TIME(std::uint32_t(this->demuxer_cache_begin)), FORMAT_TIME(std::uint32_t(this->demuxer_cache_end)),
+                FORMAT_TIME(std::uint32_t(this->demuxer_cache_end - this->demuxer_cache_begin)));
+            bullet_wrapped("RAM used: %.02fMiB (%.2fMiB forward)", double(this->demuxer_cached_bytes)/0x100000,
+                double(this->demuxer_forward_bytes)/0x100000);
+            bullet_wrapped("Speed: %.2fMiB/s", this->demuxer_cache_speed/0x100000);
+
+            ImGui::Separator();
+            ImGui::Text("Interface");
+            bullet_wrapped("FPS: %.1fHz, frame time %.1fms", io.Framerate, io.DeltaTime * 1000.0f);
+            bullet_wrapped("Vertices: %d", io.MetricsRenderVertices);
+            bullet_wrapped("Indices: %d", io.MetricsRenderIndices);
+            bullet_wrapped("Allocations: %d", io.MetricsActiveAllocations);
         }
 
         if (ImGui::BeginTabItem("Passes")) {
@@ -969,19 +1026,6 @@ void PlayerMenu::render() {
                         0.5, 0.5, 0.4, true, "%.2fms", 0.0);
                 }
             }
-        }
-
-        if (ImGui::BeginTabItem("UI")) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
-
-            ImGui::SetWindowFontScale(0.7 * float(this->renderer.image_height) / 720.0f);
-            AMPNX_SCOPEGUARD([&] { ImGui::SetWindowFontScale(float(this->renderer.image_height) / 720.0f); });
-
-            auto &io = ImGui::GetIO();
-            ImGui::BulletText("FPS: %.1fHz, frame time %.1fms", io.Framerate, io.DeltaTime * 1000.0f);
-            ImGui::BulletText("Vertices: %d", io.MetricsRenderVertices);
-            ImGui::BulletText("Indices: %d", io.MetricsRenderIndices);
-            ImGui::BulletText("Allocations: %d", io.MetricsActiveAllocations);
         }
     }
 }
