@@ -14,7 +14,6 @@ namespace ampnx {
         return _err;                    \
 })
 
-
 class LibmpvController {
     public:
         using LogCallback      = void(*)(void *user, mpv_event_log_message *mes);

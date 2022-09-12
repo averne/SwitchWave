@@ -168,7 +168,6 @@ void SeekBar::render() {
     AMPNX_SCOPEGUARD([] { ImGui::PopStyleVar(); });
     AMPNX_SCOPEGUARD([] { ImGui::PopStyleVar(); });
 
-    // ImGui::SetNextWindowFocus();
     ImGui::Begin("##seekbar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::SetWindowSize(Widget::screen_rel_vec<ImVec2>(SeekBar::BarWidth, SeekBar::BarHeight));
@@ -224,7 +223,6 @@ void SeekBar::render() {
     ImGui::ItemSize(bb);
     ImGui::ItemAdd(bb, ImGui::GetID("##seekbar"), nullptr, ImGuiItemFlags_Disabled);
 
-
     auto ts_to_seekbar_pos = [this, &interior_bb](double timestamp) {
         return std::round(interior_bb.Min.x +
             interior_bb.GetWidth() * float(timestamp) / float(this->duration));
@@ -244,6 +242,7 @@ void SeekBar::render() {
         ImVec2{interior_bb.Min.x + interior_bb.GetWidth() * float(this->percent_pos) / 100.0f, interior_bb.Max.y},
         ImGui::GetColorU32(ImGuiCol_ButtonActive));
 
+    // Chapters
     for (auto &chapter: this->chapters) {
         // Skip the first chapter
         if (chapter.time == 0.0)
@@ -395,8 +394,6 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
 
         mpv_free_node_contents(node);
     }, this);
-
-    // this->lmpv.observe_property("sub-speed", &this->sub_speed);
 }
 
 PlayerMenu::~PlayerMenu() {
@@ -416,8 +413,6 @@ PlayerMenu::~PlayerMenu() {
     this->lmpv.unobserve_property("video-params");
     this->lmpv.unobserve_property("osd-dimensions");
     this->lmpv.unobserve_property("audio-params");
-
-    // this->lmpv.unobserve_property("sub-speed");
 }
 
 bool PlayerMenu::update_state(PadState &pad, HidTouchScreenState &touch) {
@@ -500,77 +495,18 @@ void PlayerMenu::render() {
         AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
         ImGui::Text("Track");
-        if (ImGui::BeginListBox("##videolist", ImVec2(-1, 0))) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndListBox(); });
-
-            for (auto &track: this->video_tracks) {
-                if (ImGui::Selectable(track.name.c_str(), track.selected))
-                    this->lmpv.set_property_async("vid", track.track_id);
-
-                if (track.selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
+        this->video_tracklist.run(this->lmpv);
 
         ImGui::Separator();
         ImGui::Text("Quality");
+        this->profile_combo     .run(this->lmpv);
+        this->fbo_format_combo  .run(this->lmpv);
+        this->hdr_peak_checkbox .run(this->lmpv);
+        this->use_hwdec_checkbox.run(this->lmpv, +[]([[maybe_unused]] LibmpvController &lmpv, bool val) {
+            return val ? "auto" : "no";
+        });
 
-        constexpr static std::array profile_opts = {
-            std::pair{"Default", "default"},
-            std::pair{"Gpu HQ", "gpu-hq"},
-            std::pair{"Low latency", "low-latency"},
-        };
-
-        static int profile_opt = 0;
-        if (ImGui::BeginCombo("Profile", profile_opts[profile_opt].first)) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndCombo(); });
-
-            for (std::size_t i = 0; i < profile_opts.size(); i++) {
-                bool is_selected = std::size_t(profile_opt) == i;
-                if (ImGui::Selectable(profile_opts[i].first, is_selected)) {
-                    profile_opt = i;
-                    this->lmpv.set_property_async("profile", profile_opts[profile_opt].second);
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
-
-        constexpr static std::array fbo_opts = {
-            std::pair{"RGBA16F", "rgba16f"},
-            std::pair{"RGBA16", "rgba16"},
-            std::pair{"RGBA8", "rgba8"},
-            std::pair{"RGBA32F", "rgba32f"},
-        };
-
-        static int fbo_opt = 0;
-        if (ImGui::BeginCombo("FBO format", fbo_opts[fbo_opt].first)) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndCombo(); });
-
-            for (std::size_t i = 0; i < fbo_opts.size(); i++) {
-                bool is_selected = std::size_t(fbo_opt) == i;
-                if (ImGui::Selectable(fbo_opts[i].first, is_selected)) {
-                    fbo_opt = i;
-                    this->lmpv.set_property_async("fbo-format", fbo_opts[fbo_opt].second);
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
-
-        static bool compute_hdr_peak = true;
-        if (ImGui::Checkbox("Compute HDR peak", &compute_hdr_peak))
-            this->lmpv.set_property_async("hdr-compute-peak", int(compute_hdr_peak));
-
-        static bool use_hwdec = true;
-        if (ImGui::Checkbox("Use hardware decoding", &use_hwdec))
-            this->lmpv.set_property_async("hwdec", use_hwdec ? "auto" : "no");
-
-        // static bool deinterlace = false;
-        // if (ImGui::Checkbox("Deinterlace", &deinterlace))
-        //     this->lmpv.set_property_async("deinterlace", int(deinterlace));
+        // TODO: Deinterlace options (with VIC filter)
 
         ImGui::Separator();
         ImGui::Text("Window");
@@ -608,114 +544,50 @@ void PlayerMenu::render() {
             }
         }
 
-        // TODO: Custom ratios?
-        constexpr static std::array ratio_options = {
-            std::pair{"Auto", "-1"},
-            std::pair{"Disable", "0"},
-            std::pair{"1:1", "1:1"},
-            std::pair{"3:2", "3:2"},
-            std::pair{"4:3", "4:3"},
-            std::pair{"14:9", "14:9"},
-            std::pair{"14:10", "14:10"},
-            std::pair{"16:9", "16:9"},
-            std::pair{"16:10", "16:10"},
-            std::pair{"2.35:1", "2.35:1"},
-            // std::pair{"5:4", "5:4"},
-            // std::pair{"11:8", "11:8"},
-        };
-
-        static int current_ratio_idx = 0;
-        if (ImGui::BeginCombo("Aspect ratio", ratio_options[current_ratio_idx].first)) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndCombo(); });
-
-            for (std::size_t i = 0; i < ratio_options.size(); i++) {
-                bool is_selected = std::size_t(current_ratio_idx) == i;
-                if (ImGui::Selectable(ratio_options[i].first, is_selected)) {
-                    current_ratio_idx = i;
-                    this->lmpv.set_property_async("video-aspect-override", ratio_options[current_ratio_idx].second);
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
+        this->aspect_ratio_combo.run(this->lmpv);
 
         ImGui::Separator();
-
         ImGui::Text("Other");
 
-        static bool want_zoom = false;
+        auto show_submenu_window = [this](std::string_view title, auto &options) {
+            ImGui::Begin(title.data(), nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
+            ImGui::SetWindowSize(Widget::screen_rel_vec<ImVec2>(PlayerMenu::SubMenuWidth, PlayerMenu::SubMenuHeight));
+            ImGui::SetWindowPos (Widget::screen_rel_vec<ImVec2>(PlayerMenu::SubMenuPosX,  PlayerMenu::SubMenuPosY));
+            ImGui::SetWindowFontScale(float(this->renderer.image_height) / 720.0f);
+            AMPNX_SCOPEGUARD([] { ImGui::End(); });
+
+            for (auto &prop: options)
+                prop.run(this->lmpv);
+
+            if (ImGui::Button("Reset")) {
+                for (auto &prop: options)
+                    prop.reset(this->lmpv);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Return"))
+                this->want_subwindow = false;
+        };
+
         if (ImGui::Button("Zoom/Position"))
-            want_zoom ^= 1;
+            this->want_subwindow ^= true, this->subwindow_id = 0;
 
         ImGui::SameLine();
-        static bool want_equalizer = false;
         if (ImGui::Button("Color equalizer"))
-            want_equalizer ^= 1;
+            this->want_subwindow ^= true, this->subwindow_id = 1;
 
-        if (want_zoom) {
-            ImGui::Begin("Zoom##window", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar |
-                ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
-            ImGui::SetWindowSize(Widget::screen_rel_vec<ImVec2>(PlayerMenu::SubMenuWidth, PlayerMenu::SubMenuHeight));
-            ImGui::SetWindowPos (Widget::screen_rel_vec<ImVec2>(PlayerMenu::SubMenuPosX,  PlayerMenu::SubMenuPosY));
-            ImGui::SetWindowFontScale(float(this->renderer.image_height) / 720.0f);
-            AMPNX_SCOPEGUARD([] { ImGui::End(); });
-
-            // TODO: Rotates/flips?
-            static std::array props = {
-                NumericProperty<float>{"Zoom",  "video-zoom",  0, -2, 2},
-                NumericProperty<float>{"Pan X", "video-pan-x", 0, -1, 1},
-                NumericProperty<float>{"Pan Y", "video-pan-y", 0, -1, 1},
-            };
-
-            for (auto &prop: props) {
-                if (ImGui::SliderFloat(prop.display_name.data(), &prop.value, prop.min, prop.max))
-                    this->lmpv.set_property_async(prop.prop_name, double(prop.value));
+        if (this->want_subwindow) {
+            switch (this->subwindow_id) {
+                case 0:
+                    show_submenu_window("Zoom##window",            this->video_zoom_options);
+                    break;
+                case 1:
+                    show_submenu_window("Color equalizer##window", this->video_color_options);
+                    break;
+                default:
+                    break;
             }
-
-            if (ImGui::Button("Reset")) {
-                for (auto &prop: props) {
-                    prop.value = 0;
-                    this->lmpv.set_property_async(prop.prop_name, double(0));
-                }
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("Return"))
-                want_zoom = false;
-        }
-
-        if (want_equalizer) {
-            ImGui::Begin("Color equalizer##window", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar |
-                ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse);
-            ImGui::SetWindowSize(Widget::screen_rel_vec<ImVec2>(PlayerMenu::SubMenuWidth, PlayerMenu::SubMenuHeight));
-            ImGui::SetWindowPos (Widget::screen_rel_vec<ImVec2>(PlayerMenu::SubMenuPosX,  PlayerMenu::SubMenuPosY));
-            ImGui::SetWindowFontScale(float(this->renderer.image_height) / 720.0f);
-            AMPNX_SCOPEGUARD([] { ImGui::End(); });
-
-            static std::array props = {
-                NumericProperty<int>{"Brightness", "brightness", 0, -100, 100},
-                NumericProperty<int>{"Contrast",   "contrast",   0, -100, 100},
-                NumericProperty<int>{"Saturation", "saturation", 0, -100, 100},
-                NumericProperty<int>{"Gamma",      "gamma",      0, -100, 100},
-                NumericProperty<int>{"Hue",        "hue",        0, -100, 100},
-            };
-
-            for (auto &prop: props) {
-                if (ImGui::SliderInt(prop.display_name.data(), &prop.value, prop.min, prop.max))
-                    this->lmpv.set_property_async(prop.prop_name, std::int64_t(prop.value));
-            }
-
-            if (ImGui::Button("Reset")) {
-                for (auto &prop: props) {
-                    prop.value = 0;
-                    this->lmpv.set_property_async(prop.prop_name, std::int64_t(0));
-                }
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("Return"))
-                want_equalizer = false;
         }
     }
 
@@ -723,188 +595,60 @@ void PlayerMenu::render() {
         AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
         ImGui::Text("Track");
-        if (ImGui::BeginListBox("##audiolist", ImVec2(-1, 0))) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndListBox(); });
-
-            for (auto &track: this->audio_tracks) {
-                if (ImGui::Selectable(track.name.c_str(), track.selected))
-                    this->lmpv.set_property_async("aid", track.track_id);
-
-                if (track.selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
+        this->audio_tracklist.run(this->lmpv);
 
         ImGui::Separator();
         ImGui::Text("Channel mixing");
-
-        constexpr static std::array mix_options = {
-            std::pair{"Auto", "auto"},
-            std::pair{"Stereo", "stereo"},
-            std::pair{"Mono", "fc"},
-        };
-
-        static int current_mix_idx = 0;
-        if (ImGui::BeginCombo("##channelmix", mix_options[current_mix_idx].first)) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndCombo(); });
-
-            for (std::size_t i = 0; i < mix_options.size(); i++) {
-                bool is_selected = std::size_t(current_mix_idx) == i;
-                if (ImGui::Selectable(mix_options[i].first, is_selected)) {
-                    current_mix_idx = i;
-                    this->lmpv.set_property_async("audio-channels", mix_options[current_mix_idx].second);
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
+        this->downmix_combo.run(this->lmpv);
 
         ImGui::Separator();
         ImGui::Text("Volume");
-        static float soft_volume = 100;
-        if (ImGui::SliderFloat("##volumeslider", &soft_volume, 0, 150, "%.1f%"))
-            this->lmpv.set_property_async("volume", double(soft_volume));
-
-        ImGui::SameLine();
-        if (ImGui::Button("Reset##volume")) {
-            soft_volume = 100;
-            this->lmpv.set_property_async("volume", double(soft_volume));
-        }
-
-        static bool muted = false;
-        if (ImGui::Checkbox("Mute", &muted))
-            this->lmpv.set_property_async("ao-mute", int(muted));
+        this->volume_slider.run(this->lmpv, "Reset##volume");
+        this->mute_checkbox.run(this->lmpv);
 
         ImGui::Separator();
         ImGui::Text("Delay");
-        static float audio_delay = 0;
-        if (ImGui::DragFloat("##audiodelay", &audio_delay, 0.01, -FLT_MAX, FLT_MAX, "%.1fs"))
-            this->lmpv.set_property_async("audio-delay", double(audio_delay));
-
-        ImGui::SameLine();
-        if (ImGui::Button("Reset##audiodelay")) {
-            audio_delay = 0;
-            this->lmpv.set_property_async("audio-delay", double(audio_delay));
-        }
+        this->audio_delay_slider.run(this->lmpv, "Reset##audiodelay");
     }
 
     if (ImGui::BeginTabItem("Subtitles", nullptr, ImGuiTabItemFlags_NoReorder)) {
         AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
         ImGui::Text("Track");
-        if (ImGui::BeginListBox("##sublist", ImVec2(-1, 0))) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndListBox(); });
-
-            for (auto &track: this->sub_tracks) {
-                if (ImGui::Selectable(track.name.c_str(), track.selected))
-                    this->lmpv.set_property_async("sid", track.track_id);
-
-                if (track.selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
+        this->sub_tracklist.run(this->lmpv);
 
         ImGui::Separator();
         ImGui::Text("Delay");
-        static float sub_delay = 0;
-        if (ImGui::DragFloat("##subdelay", &sub_delay, 0.01, -FLT_MAX, FLT_MAX, "%.1fs"))
-            this->lmpv.set_property_async("sub-delay", double(sub_delay));
-
-        ImGui::SameLine();
-        if (ImGui::Button("Reset##subdelay")) {
-            sub_delay = 0;
-            this->lmpv.set_property_async("sub-delay", double(sub_delay));
-        }
+        this->sub_delay_slider.run(this->lmpv, "Reset##subdelay");
 
         ImGui::Separator();
-        // ImGui::Text("Speed/FPS");
         ImGui::Text("FPS");
-
-        // float speed = this->sub_speed;
-        // if (ImGui::SliderFloat("Speed", &speed, 0.1, 10.0))
-        //     this->lmpv.set_property_async("sub-speed", double(speed));
-
-        static std::array sub_fps_opts = {
-            std::pair{"Video",  0.0f},
-            std::pair{"23",     23.0f},
-			std::pair{"24",     24.0f},
-			std::pair{"25",     25.0f},
-			std::pair{"30",     30.0f},
-			std::pair{"23.976", 24000.0f/1001.0f},
-			std::pair{"29.970", 30000.0f/1001.0f},
-        };
-
-        static int sub_fps_opt = 0;
-        if (ImGui::BeginCombo("##subfps", sub_fps_opts[sub_fps_opt].first)) {
-            AMPNX_SCOPEGUARD([] { ImGui::EndCombo(); });
-
-            for (std::size_t i = 0; i < sub_fps_opts.size(); i++) {
-                bool is_selected = std::size_t(sub_fps_opt) == i;
-                if (ImGui::Selectable(sub_fps_opts[i].first, is_selected)) {
-                    sub_fps_opt = i;
-                    auto fps = sub_fps_opts[sub_fps_opt].second;
-                    if (fps == 0.0f) {
-                        double tmp;
-                        if (int res = this->lmpv.get_property("container-fps", tmp); !res)
-                            fps = tmp;
-                        printf("Got container fps: %g\n", tmp);
-                    }
-                    this->lmpv.set_property_async("sub-fps", double(fps));
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
+        this->sub_fps_combo.run(this->lmpv, +[](LibmpvController &lmpv, double val) {
+            if (val == 0.0) {
+                double tmp;
+                if (int res = lmpv.get_property("container-fps", tmp); !res)
+                    return tmp;
             }
+            return val;
+        });
 
-        }
+        // TODO: subtitle speed?
 
         ImGui::Separator();
         ImGui::Text("Size/position");
-
-        static float sub_scale = 1;
-        if (ImGui::SliderFloat("##subscale", &sub_scale, 0, 10, "Scale: %.1f"))
-            this->lmpv.set_property_async("sub-scale", double(sub_scale));
-
-        ImGui::SameLine();
-        if (ImGui::Button("Reset##subscale")) {
-            sub_scale = 1;
-            this->lmpv.set_property_async("sub-scale", double(sub_scale));
-        }
-
-        static int sub_pos = 100;
-        if (ImGui::SliderInt("##subpos", &sub_pos, 0, 150, "Position: %d%"))
-            this->lmpv.set_property_async("sub-pos", std::int64_t(sub_pos));
-
-        ImGui::SameLine();
-        if (ImGui::Button("Reset##subpos")) {
-            sub_pos = 100;
-            this->lmpv.set_property_async("sub-pos", std::int64_t(sub_pos));
-        }
+        this->sub_scale_slider.run(this->lmpv, "Reset##subscale");
+        this->sub_pos_slider  .run(this->lmpv, "Reset##subpos");
 
         ImGui::Separator();
         ImGui::Text("Style");
-
-        static bool use_embedded_fonts = true;
-        if (ImGui::Checkbox("Use embedded fonts", &use_embedded_fonts))
-            this->lmpv.set_property_async("embeddedfonts", int(use_embedded_fonts));
+        this->embedded_fonts_checkbox.run(this->lmpv);
     }
 
     if (ImGui::BeginTabItem("Misc")) {
         AMPNX_SCOPEGUARD([] { ImGui::EndTabItem(); });
 
         ImGui::Text("Demuxer cache");
-
-        static std::array demuxer_cache_opts = {
-            "auto", "yes", "no",
-        };
-
-        static int demuxer_cache_opt = 0;
-        if (ImGui::Combo("##demuxercache", &demuxer_cache_opt,
-                demuxer_cache_opts.data(), demuxer_cache_opts.size()))
-            this->lmpv.set_property_async("cache", demuxer_cache_opts[demuxer_cache_opt]);
-
-        ImGui::Separator();
+        this->cache_combo.run(this->lmpv);
     }
 
     auto bullet_wrapped = [](std::string_view fmt, auto &&...args) {
