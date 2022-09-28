@@ -322,33 +322,33 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
 
     this->last_stats_update = std::chrono::system_clock::now();
 
-    this->lmpv.observe_property("file-format", &this->file_format);
-    this->lmpv.observe_property("video-codec", &this->video_codec);
-    this->lmpv.observe_property("audio-codec", &this->audio_codec);
-    this->lmpv.observe_property("hwdec-current", &this->hwdec_current);
-    this->lmpv.observe_property("hwdec-interop", &this->hwdec_interop);
-    this->lmpv.observe_property("avsync", &this->avsync);
+    this->lmpv.observe_property("file-format",      &this->file_format);
+    this->lmpv.observe_property("video-codec",      &this->video_codec);
+    this->lmpv.observe_property("audio-codec",      &this->audio_codec);
+    this->lmpv.observe_property("hwdec-current",    &this->hwdec_current);
+    this->lmpv.observe_property("hwdec-interop",    &this->hwdec_interop);
+    this->lmpv.observe_property("avsync",           &this->avsync);
     this->lmpv.observe_property("frame-drop-count", &this->dropped_vo_frames,
 #ifdef DEBUG
-    [](void*, mpv_event_property *prop) {
-        std::printf("VO  dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
-    }
+        [](void*, mpv_event_property *prop) {
+            std::printf("VO  dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
+        }
 #else
-    nullptr
+        nullptr
 #endif
     );
     this->lmpv.observe_property("decoder-frame-drop-count", &this->dropped_dec_frames,
 #ifdef DEBUG
-    [](void*, mpv_event_property *prop) {
-        std::printf("DEC dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
-    }
+        [](void*, mpv_event_property *prop) {
+            std::printf("DEC dropped: %ld\n", *static_cast<std::int64_t *>(prop->data));
+        }
 #else
     nullptr
 #endif
     );
-    this->lmpv.observe_property("video-bitrate", &this->video_bitrate);
-    this->lmpv.observe_property("audio-bitrate", &this->audio_bitrate);
-    this->lmpv.observe_property("container-fps", &this->container_specified_fps);
+    this->lmpv.observe_property("video-bitrate",    &this->video_bitrate);
+    this->lmpv.observe_property("audio-bitrate",    &this->audio_bitrate);
+    this->lmpv.observe_property("container-fps",    &this->container_specified_fps);
     this->lmpv.observe_property("estimated-vf-fps", &this->container_estimated_fps);
 
     this->lmpv.observe_property("video-params", MPV_FORMAT_NODE, nullptr, [](void *user, mpv_event_property *prop) {
@@ -359,7 +359,7 @@ PlayerMenu::PlayerMenu(Renderer &renderer, LibmpvController &lmpv): Widget(rende
         self->video_width       = LibmpvController::node_map_find<std::int64_t>(params, "w");
         self->video_height      = LibmpvController::node_map_find<std::int64_t>(params, "h");
         self->video_pixfmt      = LibmpvController::node_map_find<char *>(params, "pixelformat")    ?: "";
-        self->video_hw_piwfmt   = LibmpvController::node_map_find<char *>(params, "hw-pixelformat") ?: "";
+        self->video_hw_pixfmt   = LibmpvController::node_map_find<char *>(params, "hw-pixelformat") ?: "";
         self->video_colorspace  = LibmpvController::node_map_find<char *>(params, "colormatrix")    ?: "";
         self->video_color_range = LibmpvController::node_map_find<char *>(params, "colorlevels")    ?: "";
         self->video_gamma       = LibmpvController::node_map_find<char *>(params, "gamma")          ?: "";
@@ -682,9 +682,9 @@ void PlayerMenu::render() {
             bullet_wrapped("Dropped: %ld (VO) %ld (decoder)", this->dropped_vo_frames, this->dropped_dec_frames);
             bullet_wrapped("Size: %dx%d, scaled: %dx%d", this->video_width, this->video_height,
                 this->video_width_scaled, this->video_height_scaled);
-            if (!this->video_hw_piwfmt.empty())
+            if (!this->video_hw_pixfmt.empty())
                 bullet_wrapped("Pixel format: %s [%s]",
-                    this->video_pixfmt.c_str(), this->video_hw_piwfmt.c_str());
+                    this->video_pixfmt.c_str(), this->video_hw_pixfmt.c_str());
             else
                 bullet_wrapped("Pixel format: %s", this->video_pixfmt.c_str());
             bullet_wrapped("Colorspace: %s, range: %s, gamma: %s", this->video_colorspace.c_str(),
