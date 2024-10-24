@@ -190,7 +190,6 @@ bool PlayerGui::update_state(PadState &pad, HidTouchScreenState &touch) {
 
         if ((buttons & (HidNpadButton_Up | HidNpadButton_Down)) &&
                 (down & (HidNpadButton_ZL | HidNpadButton_ZR))) {
-            printf("Chapter: %ld\n", this->seek_bar.chapter);
             auto chapter = this->seek_bar.chapter;
             if (down & HidNpadButton_ZL)
                 chapter -= 1;

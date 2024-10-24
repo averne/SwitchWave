@@ -41,6 +41,14 @@ class Path {
             return std::filesystem::path(this->base_);
         }
 
+        inline std::size_t length() const {
+            return this->base_.length();
+        }
+
+        inline std::size_t size() const {
+            return this->base_.size();
+        }
+
         inline bool empty() const {
             return this->base_.empty();
         }

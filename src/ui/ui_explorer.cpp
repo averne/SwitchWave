@@ -66,13 +66,22 @@ bool Explorer::update_state(PadState &pad, HidTouchScreenState &touch) {
             auto *reent    = __syscall_getreent();
             auto *devoptab = devoptab_list[dir->dirData->device];
 
+            // Hack to support the recent filesystem: NAME_MAX is sufficient in theory,
+            // but this fs returns full paths
+            // PATH_MAX on devkitA64 is just 1024 but linux allows 4096
+            // On top of that, reserve some space for the mountpoint
+            std::string fname;
+            fname.reserve(4096+1+0x20);
+
             struct stat st;
             while (true) {
+                std::memset(fname.data(), '\0', fname.capacity());
+
                 reent->deviceData = devoptab->deviceData;
-                if (devoptab->dirnext_r(reent, dir->dirData, dir->fileData.d_name, &st))
+                if (devoptab->dirnext_r(reent, dir->dirData, fname.data(), &st))
                     break;
 
-                auto path = this->path / dir->fileData.d_name;
+                auto path = this->path / fname.c_str();
 
                 // Strip "recent:/" from path
                 if (this->context.cur_fs->type == fs::Filesystem::Type::Recent)

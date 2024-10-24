@@ -123,7 +123,7 @@ int RecentFs::recent_dirnext(struct _reent *r, DIR_ITER *dirState, char *filenam
     if (priv_dir->it != priv->recent_files.end()) {
         auto &path = *priv_dir->it;
 
-        std::strncpy(filename, path.c_str(), NAME_MAX);
+        std::strncpy(filename, path.c_str(), path.length());
         ::stat(path.c_str(), filestat);
 
         ++priv_dir->it;
