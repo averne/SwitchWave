@@ -165,6 +165,9 @@ PlayerGui::PlayerGui(Renderer &renderer, Context &context, LibmpvController &lmp
         Widget(renderer), lmpv(lmpv), context(context),
         seek_bar(renderer, context, lmpv), menu(renderer, context, lmpv), console(renderer, lmpv) {
     this->screenshot_button_thread = std::jthread(&PlayerGui::screenshot_button_thread_fn, this);
+
+    auto &imstyle = ImGui::GetStyle();
+    imstyle.Alpha = 0.8f;
 }
 
 PlayerGui::~PlayerGui() {
@@ -384,9 +387,6 @@ bool PlayerGui::update_state(PadState &pad, HidTouchScreenState &touch) {
 }
 
 void PlayerGui::render() {
-    auto &imstyle = ImGui::GetStyle();
-    imstyle.Alpha = 0.8f;
-
     this->menu    .render();
     this->seek_bar.render();
     this->console .render();
@@ -875,6 +875,11 @@ PlayerMenu::PlayerMenu(Renderer &renderer, Context &context, LibmpvController &l
 
     for (auto &prop: this->video_color_options)
         prop.observe(this->lmpv);
+
+    // ImPlot doesn't respect the global imgui alpha
+    auto &plotstyle = ImPlot::GetStyle();
+    plotstyle.Colors[ImPlotCol_FrameBg] = ImVec4();
+    plotstyle.Colors[ImPlotCol_PlotBg]  = ImVec4();
 }
 
 PlayerMenu::~PlayerMenu() {

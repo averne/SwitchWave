@@ -63,9 +63,12 @@ MainMenuGui::MainMenuGui(Renderer &renderer, Context &context):
         Widget(renderer), context(context),
         explorer(renderer, context), editor(renderer, context), settings(renderer, context), infohelp(renderer) {
     // Enable nav highlight when booting
-    auto &imctx = *ImGui::GetCurrentContext();
+    auto &imctx   = *ImGui::GetCurrentContext();
+    auto &imstyle = ImGui::GetStyle();
+
     imctx.NavDisableHighlight  = false;
     imctx.NavDisableMouseHover = true;
+    imstyle.Alpha              = 0.85f;
 }
 
 bool MainMenuGui::update_state(PadState &pad, HidTouchScreenState &touch) {
@@ -89,7 +92,6 @@ bool MainMenuGui::update_state(PadState &pad, HidTouchScreenState &touch) {
 void MainMenuGui::render() {
     auto &imctx   = *ImGui::GetCurrentContext();
     auto &imstyle = ImGui::GetStyle();
-    imstyle.Alpha = 0.85f;
 
     {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
