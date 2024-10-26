@@ -215,10 +215,16 @@ bool PlayerGui::update_state(PadState &pad, HidTouchScreenState &touch) {
             std::pair{ImGuiKey_GamepadR2, +60.0},
         };
 
+        bool has_seeked = false;
         for (auto &&[key, time]: key_seek_map) {
-            if (ImGui::IsKeyPressed(key))
+            if (ImGui::IsKeyPressed(key)) {
                 this->lmpv.set_property_async("time-pos", this->seek_bar.time_pos + time);
+                has_seeked = true;
+            }
         }
+
+        if (has_seeked && this->seek_bar.is_visible && !this->seek_bar.ignore_input)
+            this->seek_bar.begin_visible();
     }
 
     auto &io = ImGui::GetIO();
@@ -234,6 +240,9 @@ bool PlayerGui::update_state(PadState &pad, HidTouchScreenState &touch) {
         this->set_show_string(1s, "%02u:%02u:%02u (%+.1fs)",
             FORMAT_TIME(std::uint32_t(this->seek_bar.duration * percent_pos / 100.0)), this->seek_bar.time_pos - this->js_time_start);
         this->lmpv.set_property_async("percent-pos", percent_pos);
+
+        if (this->seek_bar.is_visible && !this->seek_bar.ignore_input)
+            this->seek_bar.begin_visible();
     } else {
         this->js_time_start = 0.0;
     }
@@ -345,6 +354,9 @@ bool PlayerGui::update_state(PadState &pad, HidTouchScreenState &touch) {
                     this->set_show_string(1s, "%02u:%02u:%02u (%+.1fs)",
                         FORMAT_TIME(std::uint32_t(this->touch_setting_start.time_pos + time_pos)), time_pos);
                     this->lmpv.set_property_async("time-pos", this->touch_setting_start.time_pos + time_pos);
+
+                    if (this->seek_bar.is_visible && !this->seek_bar.ignore_input)
+                        this->seek_bar.begin_visible();
                 }
                 break;
             case TouchGestureState::SlideBrightness: {
