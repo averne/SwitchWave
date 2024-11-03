@@ -301,7 +301,7 @@ class PlayerMenu final: public Widget {
         constexpr static float SubMenuPosX          = 0.22;
         constexpr static float SubMenuPosY          = 0.02;
         constexpr static float FilepickerWidth      = 0.625;
-        constexpr static float FilepickerHeight     = 0.875;
+        constexpr static float FilepickerHeight     = 0.925;
         constexpr static float FilepickerPosX       = 0.02;
         constexpr static float FilepickerPosY       = 0.02;
         constexpr static auto  StatsRefreshInterval = 1.0s;
