@@ -148,7 +148,7 @@ SftpFs::SftpFs(Context &context, std::string_view name, std::string_view mount_n
     this->mount_name = mount_name;
 
     this->devoptab = {
-        .name         = SftpFs::name.data(),
+        .name         = this->name.data(),
 
         .structSize   = sizeof(SftpFsFile),
         .open_r       = SftpFs::sftp_open,
@@ -229,7 +229,7 @@ int SftpFs::connect(std::string_view host, std::uint16_t port, std::string_view 
                 .events = POLLOUT,
             };
 
-            rc = ::poll(&pollfd, 1, 3e3);
+            rc = ::poll(&pollfd, 1, 3000);
             if (rc > 0) {
                 socklen_t len = sizeof(rc);
                 ::getsockopt(this->sock, SOL_SOCKET, SO_ERROR, &rc, &len);

@@ -66,8 +66,7 @@ class SmbFs final: public NetworkFilesystem {
             struct smb2dir *handle;
         };
 
-    // private:
-    public:
+    private:
         Context &context;
 
         smb2_context *smb_ctx = nullptr;

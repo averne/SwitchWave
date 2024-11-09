@@ -68,7 +68,7 @@ SmbFs::SmbFs(Context &context, std::string_view name, std::string_view mount_nam
     this->mount_name = mount_name;
 
     this->devoptab = {
-        .name         = SmbFs::name.data(),
+        .name         = this->name.data(),
 
         .structSize   = sizeof(SmbFs),
         .open_r       = SmbFs::smb_open,

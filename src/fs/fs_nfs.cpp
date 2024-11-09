@@ -59,7 +59,7 @@ NfsFs::NfsFs(Context &context, std::string_view name, std::string_view mount_nam
     this->mount_name = mount_name;
 
     this->devoptab = {
-        .name         = NfsFs::name.data(),
+        .name         = this->name.data(),
 
         .structSize   = sizeof(NfsFs),
         .open_r       = NfsFs::nfs_open,
