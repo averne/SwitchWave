@@ -51,7 +51,9 @@ int Context::read_from_file() {
             if (n == "fast-presentation")
                 self->use_fast_presentation = v != "no";
             else if (n == "disable-screensaver")
-                self->disable_screensaver = v != "no";
+                self->disable_screensaver   = v != "no";
+            else if (n == "quit-to-home-menu")
+                self->quit_to_home_menu     = v != "no";
             else if (n == "override-screenshot-button")
                 self->override_screenshot_button = v != "no";
             else if (n == "history-size")
@@ -116,6 +118,7 @@ int Context::write_to_file() {
 
     TRY_WRITE(std::fprintf(fp, "%s = %s\n",  "fast-presentation",          this->use_fast_presentation      ? "yes" : "no"));
     TRY_WRITE(std::fprintf(fp, "%s = %s\n",  "disable-screensaver",        this->disable_screensaver        ? "yes" : "no"));
+    TRY_WRITE(std::fprintf(fp, "%s = %s\n",  "quit-to-home-menu",          this->quit_to_home_menu          ? "yes" : "no"));
     TRY_WRITE(std::fprintf(fp, "%s = %s\n",  "override-screenshot-button", this->override_screenshot_button ? "yes" : "no"));
     TRY_WRITE(std::fprintf(fp, "%s = %ld\n", "history-size",               this->history_size));
 

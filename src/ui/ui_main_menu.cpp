@@ -917,6 +917,38 @@ void SettingsEditor::render() {
     ImGui::Checkbox("Override screenshot button", &this->context.override_screenshot_button);
 
     ImGui::NewLine();
+    ImGui::Text("Misc");
+    ImGui::Checkbox("Quit to home menu",          &this->context.quit_to_home_menu);
+
+    ImGui::TableNextColumn();
+    ImGui::Text("History");
+
+    {
+        ImGui::PushItemWidth(this->screen_rel_width(0.2));
+        SW_SCOPEGUARD([] { ImGui::PopItemWidth(); });
+
+        std::size_t history_size_min = 0;
+        ImGui::DragScalar("Max entries", ImGuiDataType_U64, &context.history_size, 0.05f, &history_size_min);
+    }
+
+    if (ImGui::Button("Clear history")) {
+        for (auto &fs: this->context.filesystems) {
+            if (fs->type == fs::Filesystem::Type::Recent)
+                reinterpret_cast<fs::RecentFs *>(fs.get())->clear();
+        }
+    }
+
+    // We would need to parse mpv.conf to be certain of the watch_later directory's location
+    ImGui::SameLine();
+    if (ImGui::Button("Clear playback positions")) {
+        auto path = fs::Path(Context::AppDirectory) / "watch_later";
+
+        // Using rmdir would need to clear all the files inside beforehand, so just use a faster native call
+        if (auto rc = fsdevDeleteDirectoryRecursively(path.c_str()); R_FAILED(rc))
+            this->context.set_error(EIO);
+    }
+
+    ImGui::NewLine();
     ImGui::Text("USB");
 
     if (ImGui::BeginTable("##usblistbox", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_ScrollY,
@@ -955,34 +987,6 @@ void SettingsEditor::render() {
                 context.ums.unmount_device(dev);
             }
         }
-    }
-
-    ImGui::TableNextColumn();
-    ImGui::Text("History");
-
-    {
-        ImGui::PushItemWidth(this->screen_rel_width(0.2));
-        SW_SCOPEGUARD([] { ImGui::PopItemWidth(); });
-
-        std::size_t history_size_min = 0;
-        ImGui::DragScalar("Max entries", ImGuiDataType_U64, &context.history_size, 0.05f, &history_size_min);
-    }
-
-    if (ImGui::Button("Clear history")) {
-        for (auto &fs: this->context.filesystems) {
-            if (fs->type == fs::Filesystem::Type::Recent)
-                reinterpret_cast<fs::RecentFs *>(fs.get())->clear();
-        }
-    }
-
-    // We would need to parse mpv.conf to be certain of the watch_later directory's location
-    ImGui::SameLine();
-    if (ImGui::Button("Clear playback positions")) {
-        auto path = fs::Path(Context::AppDirectory) / "watch_later";
-
-        // Using rmdir would need to clear all the files inside beforehand, so just use a faster native call
-        if (auto rc = fsdevDeleteDirectoryRecursively(path.c_str()); R_FAILED(rc))
-            this->context.set_error(EIO);
     }
 }
 

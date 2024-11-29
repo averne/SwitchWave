@@ -62,6 +62,7 @@ class Context {
         bool use_fast_presentation      = false;
         bool disable_screensaver        = true;
         bool override_screenshot_button = false;
+        bool quit_to_home_menu          = false;
 
         std::size_t history_size = 50;
         std::string cur_path;

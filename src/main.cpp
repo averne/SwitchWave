@@ -48,6 +48,8 @@ bool                g_application_mode;
 
 FsFileSystem        g_bis_user_fs;
 
+extern "C" u32 __nx_applet_exit_mode, __nx_nv_service_type, __nx_nv_transfermem_size;
+
 extern "C" void userAppInit(void) {
     // Keep the main thread above others so that the program stays responsive
     // when doing software decoding
@@ -60,7 +62,6 @@ extern "C" void userAppInit(void) {
 
     // To get access to /dev/nvhost-nvjpg, we need nvdrv:{a,s,t}
     // However, nvdrv:{a,s} have limited address space for gpu mappings
-    extern u32 __nx_nv_service_type, __nx_nv_transfermem_size;
     __nx_nv_service_type     = NvServiceType_Factory;
     __nx_nv_transfermem_size = (g_application_mode ? 16 : 3) * 0x100000;
 
@@ -396,6 +397,9 @@ int main(int argc, const char **argv) {
 
     if (context.write_to_file())
         std::printf("Failed to write config to file\n");
+
+    if (context.quit_to_home_menu && !context.cli_mode)
+        __nx_applet_exit_mode = 1;
 
     std::printf("Properly exiting\n");
     return 0;
