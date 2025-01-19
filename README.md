@@ -35,7 +35,7 @@ A hardware-accelerated media player for the Nintendo Switch, built on mpv and FF
 ## Building
 The build process is roughly outlined in the following:
 - Set up a [devkitpro](https://devkitpro.org/wiki/devkitPro_pacman) environment for Switch homebrew development.
-- Install the following packages: `switch-bzip2`, `switch-dav1d`, `switch-freetype`, `switch-glm`, `switch-harfbuzz`, `switch-libarchive`, `switch-libass`, `switch-libfribidi`, `switch-libjpeg-turbo`, `switch-libpng`, `switch-libwebp`, `switch-libssh2`, `switch-mbedtls`, `switch-ntfs-3g`, `switch-lwext4` and `switch-pkg-config`. In addition, the following build dependencies are required: `dkp-meson-scripts`, `dkp-toolchain-vars`, and [Gimp](https://www.gimp.org/).
+- Install the following packages: `switch-bzip2`, `switch-dav1d`, `switch-freetype`, `switch-glm`, `switch-harfbuzz`, `switch-libarchive`, `switch-libass`, `switch-libfribidi`, `switch-libjpeg-turbo`, `switch-libpng`, `switch-libwebp`, `switch-libssh2`, `switch-mbedtls`, `switch-ntfs-3g` and `switch-lwext4`. In addition, the following build dependencies are required: `switch-pkg-config`, `dkp-meson-scripts`, `dkp-toolchain-vars`, and [Gimp](https://www.gimp.org/).
 - Compile and install a GPL build of [libusbhsfs](https://github.com/DarkMatterCore/libusbhsfs).
 - Compile and install [libsmb2](misc/libsmb2/) and [libnfs](misc/libnfs/).
 - Configure, compile and install FFmpeg: `make configure-ffmpeg && make build-ffmpeg -j$(nproc)`.
