@@ -5,6 +5,9 @@
 [submodule "mpv"]
 	path = mpv
 	url = https://github.com/averne/mpv.git
+[submodule "envideo"]
+	path = envideo
+	url = https://github.com/averne/envideo.git
 [submodule "libuam"]
 	path = libuam
 	url = https://github.com/averne/libuam.git
