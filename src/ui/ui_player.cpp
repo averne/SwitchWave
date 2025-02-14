@@ -1496,9 +1496,9 @@ void PlayerMenu::render() {
 
                 ImGui::SeparatorText("Hardware filters");
 
-                run_vic_spatialfilter("Sharpness", "sharpness_nvtegra", "vicsharp", "sharpness",
+                run_vic_spatialfilter("Sharpness", "sharpness_envideo", "vicsharp", "sharpness",
                     has_sharpness_filter, sharpness_value, sharpness_dimensions);
-                run_vic_spatialfilter("Denoise",   "denoise_nvtegra",   "vicnoise", "denoise",
+                run_vic_spatialfilter("Denoise",   "denoise_envideo",   "vicnoise", "denoise",
                     has_denoise_filter,   denoise_value,   denoise_dimensions);
 
                 constexpr static auto hw_deint_filter_name = "vicdeint"sv;
@@ -1512,7 +1512,7 @@ void PlayerMenu::render() {
                     if (has_hw_deinterlace) {
                         utils::StaticString<128> cmd;
                         std::snprintf(cmd.data(), cmd.capacity(),
-                            "@%s:lavfi=[deinterlace_nvtegra=mode=%s]",
+                            "@%s:lavfi=[deinterlace_envideo=mode=%s]",
                             hw_deint_filter_name.data(),
                             deint_mode_options[this->hw_deinterlace_mode].second.data());
 

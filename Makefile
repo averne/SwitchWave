@@ -10,7 +10,7 @@ APP_COMMIT              :=  $(shell git rev-parse --short HEAD)
 
 FFMPEG_CONFIG           :=  --enable-asm \
                             --enable-gpl \
-                            --enable-nvtegra \
+                            --enable-envideo \
                             --enable-static --disable-shared \
 							--enable-libdav1d --enable-libwebp \
                             --enable-zlib --enable-bzlib \
@@ -37,7 +37,7 @@ BUILD                   :=  build
 ROMFS                   :=  $(BUILD)/romfs
 INSTALL                 :=  $(TOPDIR)/$(BUILD)/install
 PACKAGES                :=  mpv libavcodec libavformat libavfilter libavutil libswscale libswresample \
-                            uam libsmb2 libnfs libssh2 freetype2 libarchive
+                            uam envideo libsmb2 libnfs libssh2 freetype2 libarchive
 LIBDIRS                 :=  $(INSTALL)
 
 DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L timegm=mktime \
@@ -68,7 +68,7 @@ export AS               :=  $(PREFIX)as
 export AR               :=  $(PREFIX)ar
 export LD               :=  $(PREFIX)g++
 export NM               :=  $(PREFIX)nm
-export PKG_CONFIG       :=  pkg-config
+export PKG_CONFIG       :=  pkg-config --static
 export SHELL            :=  env PATH=$(PATH) PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) $(SHELL)
 
 OUTPUT                  :=  $(BUILD)/$(TARGET).nro
@@ -145,15 +145,23 @@ all: $(OUTPUT)
 
 dist: $(DIST_TARGET)
 
-configure: configure-ffmpeg configure-mpv configure-uam
-libraries: build-ffmpeg build-mpv build-uam
+configure: configure-envideo configure-ffmpeg configure-mpv configure-uam
+libraries: build-envideo build-ffmpeg build-mpv build-uam
+
+configure-envideo:
+	@cd $(TOPDIR)/envideo; \
+		$(DEVKITPRO)/meson-toolchain.sh switch > crossfile.txt
+	@cd $(TOPDIR)/envideo; \
+		meson setup $(TOPDIR)/$(BUILD)/envideo --cross-file=crossfile.txt --prefix=$(INSTALL) \
+		-Dnvgpu=enabled -Ddefault_library=static -Dbuildtype=debug
 
 configure-ffmpeg:
 	@echo Configuring ffmpeg with flags $(FFMPEG_CONFIG)
 	@mkdir -p $(BUILD)/ffmpeg
 	@cd $(BUILD)/ffmpeg; \
 		$(TOPDIR)/ffmpeg/configure --prefix=$(INSTALL) \
-		--cc="$(CC)" --cxx="$(CXX)" --ar="$(AR)" --nm="$(NM)" \
+		--cc="$(CC)" --cxx="$(CXX)" --ld="$(LD)" --ar="$(AR)" --nm="$(NM)" \
+		--pkg-config="$(PKG_CONFIG)" \
 		--extra-cflags="-isystem $(LIBNX)/include $(LIB_WARNINGS)" \
 		$(FFMPEG_CONFIG)
 
@@ -171,6 +179,9 @@ configure-uam:
 		$(DEVKITPRO)/meson-toolchain.sh switch > crossfile.txt
 	@cd $(TOPDIR)/libuam; \
 		meson setup $(TOPDIR)/$(BUILD)/libuam --cross-file=crossfile.txt --prefix=$(INSTALL)
+
+build-envideo:
+	@meson install -C $(BUILD)/envideo
 
 build-ffmpeg:
 	@$(MAKE) --no-print-directory -C $(BUILD)/ffmpeg install
