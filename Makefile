@@ -227,7 +227,7 @@ $(ROMFS)/shaders/%_fsh.dksh: $(SHADERS)/%_fsh.glsl
 $(ROMFS)/textures/%.bc: $(TEXTURES)/%.svg
 	@echo "BCn     " $@
 	@mkdir -p $(dir $@)
-	@misc/gimp-bcn-convert.sh $< $@ > /dev/null 2>&1
+	@misc/gimp-bcn-convert.sh $< $@
 
 run: $(OUTPUT)
 	@nxlink -r 100 -s $(OUTPUT) -p SwitchWave/SwitchWave.nro
