@@ -49,9 +49,10 @@ namespace sw::ui {
 
 using namespace std::chrono_literals;
 
+extern "C" const char mpv_version[];
+
 namespace {
 
-extern "C" const char mpv_version[];
 std::string_view app_version_str = "v" APP_VERSION,
     app_build_date_str = __DATE__ " " __TIME__;
 
