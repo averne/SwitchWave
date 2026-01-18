@@ -1,3 +1,4 @@
+#!/bin/bash
 # file-in file-out
 
 if ! [ -x "$(command -v gimp)" ]; then
