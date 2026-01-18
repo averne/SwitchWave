@@ -39,6 +39,8 @@
 
 using namespace std::chrono_literals;
 
+extern "C" u32 __nx_applet_exit_mode, __nx_nv_service_type, __nx_nv_transfermem_size;
+
 namespace {
 
 PadState            g_pad;
@@ -47,8 +49,6 @@ std::mutex          g_setup_mtx;
 bool                g_application_mode;
 
 FsFileSystem        g_bis_user_fs;
-
-extern "C" u32 __nx_applet_exit_mode, __nx_nv_service_type, __nx_nv_transfermem_size;
 
 extern "C" void userAppInit(void) {
     // Keep the main thread above others so that the program stays responsive
