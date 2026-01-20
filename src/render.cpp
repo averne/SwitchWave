@@ -151,7 +151,7 @@ void Renderer::mpv_render_thread_fn(std::stop_token token) {
 
 int Renderer::initialize() {
     this->dk = dk::DeviceMaker()
-        .setFlags(DkDeviceFlags_OriginUpperLeft)
+        .setFlags(DkDeviceFlags_DepthZeroToOne | DkDeviceFlags_OriginUpperLeft)
         .create();
     if (!this->dk)
         return -1;

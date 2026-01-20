@@ -39,8 +39,6 @@
 
 using namespace std::chrono_literals;
 
-namespace {
-
 PadState            g_pad;
 HidTouchScreenState g_touch_state;
 std::mutex          g_setup_mtx;
@@ -104,6 +102,8 @@ extern "C" void userAppExit(void) {
 
     socketExit();
 }
+
+namespace {
 
 void mpv_presetup() {
     auto lk = std::scoped_lock(g_setup_mtx);

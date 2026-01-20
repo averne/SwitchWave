@@ -49,9 +49,10 @@ namespace sw::ui {
 
 using namespace std::chrono_literals;
 
+extern "C" const char mpv_version[];
+
 namespace {
 
-extern "C" const char mpv_version[];
 std::string_view app_version_str = "v" APP_VERSION,
     app_build_date_str = __DATE__ " " __TIME__;
 
@@ -750,7 +751,7 @@ void SettingsEditor::render() {
     ImGui::NewLine();
     ImGui::Text("Network");
 
-    utils::StaticString32 id_buffer;
+    utils::StaticString64 id_buffer;
     auto make_id = [&id_buffer](std::size_t i, std::string_view s) {
         std::snprintf(id_buffer.data(), id_buffer.capacity(), "%s##%ld", s.data(), i);
         return id_buffer.data();

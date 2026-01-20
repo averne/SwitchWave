@@ -50,7 +50,7 @@ CFLAGS                  :=  -std=gnu11
 CXXFLAGS                :=  -std=gnu++23
 ASFLAGS                 :=
 LDFLAGS                 :=  -g -Wl,--gc-sections -Wl,-pie -specs=$(DEVKITPRO)/libnx/switch.specs
-LINKS                   :=  -lusbhsfs -lntfs-3g -llwext4 -lharfbuzz -lnx
+LINKS                   :=  -lusbhsfs -lntfs-3g -llwext4 -ldeko3d -lnx
 PREFIX                  :=  aarch64-none-elf-
 
 # -----------------------------------------------
@@ -168,9 +168,7 @@ configure-mpv:
 
 configure-uam:
 	@cd $(TOPDIR)/libuam; \
-		$(DEVKITPRO)/meson-toolchain.sh switch > crossfile.txt
-	@cd $(TOPDIR)/libuam; \
-		meson setup $(TOPDIR)/$(BUILD)/libuam --cross-file=crossfile.txt --prefix=$(INSTALL)
+		meson setup $(TOPDIR)/$(BUILD)/libuam --cross-file=$(TOPDIR)/misc/crossfile.txt --prefix=$(INSTALL)
 
 build-ffmpeg:
 	@$(MAKE) --no-print-directory -C $(BUILD)/ffmpeg install

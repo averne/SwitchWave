@@ -1,0 +1,25 @@
+[binaries]
+c = '/opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc'
+cpp = '/opt/devkitpro/devkitA64/bin/aarch64-none-elf-g++'
+ar = '/opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc-ar'
+strip = '/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip'
+pkg-config = 'pkg-config'
+
+[built-in options]
+c_args = ['-D__SWITCH__','-I/opt/devkitpro/portlibs/switch/include','-isystem','/opt/devkitpro/libnx/include','-march=armv8-a+crc+crypto','-mtune=cortex-a57','-mtp=soft','-fPIC','-ftls-model=local-exec','-O2','-ffunction-sections','-fdata-sections']
+c_link_args = ['-march=armv8-a+crc+crypto','-mtune=cortex-a57','-mtp=soft','-fPIC','-ftls-model=local-exec','-L/opt/devkitpro/portlibs/switch/lib','-L/opt/devkitpro/libnx/lib','-lnx']
+cpp_args = ['-D__SWITCH__','-I/opt/devkitpro/portlibs/switch/include','-isystem','/opt/devkitpro/libnx/include','-march=armv8-a+crc+crypto','-mtune=cortex-a57','-mtp=soft','-fPIC','-ftls-model=local-exec','-O2','-ffunction-sections','-fdata-sections']
+cpp_link_args = ['-march=armv8-a+crc+crypto','-mtune=cortex-a57','-mtp=soft','-fPIC','-ftls-model=local-exec','-L/opt/devkitpro/portlibs/switch/lib','-L/opt/devkitpro/libnx/lib','-lnx']
+default_library = 'static'
+
+[host_machine]
+system = 'horizon'
+cpu_family = 'aarch64'
+cpu = 'cortex-a57'
+endian = 'little'
+
+[target_machine]
+system = 'horizon'
+cpu_family = 'aarch64'
+cpu = 'cortex-a57'
+endian = 'little'
