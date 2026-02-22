@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: switchwave-builder
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build SwitchWave
+        run: ./build-docker.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: SwitchWave
+          path: build/SwitchWave-*.zip
