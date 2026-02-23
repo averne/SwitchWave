@@ -5,7 +5,7 @@ endif
 APP_TITLE               :=  SwitchWave
 APP_AUTHOR              :=  averne
 APP_ICON                :=  icon.jpg
-APP_VERSION             :=  1.0.1
+APP_VERSION             :=  1.0.2
 APP_COMMIT              :=  $(shell git rev-parse --short HEAD)
 
 FFMPEG_CONFIG           :=  --enable-asm \
@@ -225,7 +225,7 @@ $(ROMFS)/shaders/%_fsh.dksh: $(SHADERS)/%_fsh.glsl
 $(ROMFS)/textures/%.bc: $(TEXTURES)/%.svg
 	@echo "BCn     " $@
 	@mkdir -p $(dir $@)
-	@misc/gimp-bcn-convert.sh $< $@ > /dev/null 2>&1
+	@misc/gimp-bcn-convert.sh $< $@
 
 run: $(OUTPUT)
 	@nxlink -r 100 -s $(OUTPUT) -p SwitchWave/SwitchWave.nro

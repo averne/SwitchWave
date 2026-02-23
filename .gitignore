@@ -60,3 +60,5 @@ misc/*/*
 !misc/crossfile.txt
 
 assets/icon.svg
+
+.DS_Store
