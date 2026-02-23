@@ -371,13 +371,14 @@ void MediaExplorer::render() {
         return;
 
     auto &entry = this->explorer.entries[ent_idx];
-    if (entry.type == fs::Node::Type::Directory)
-        return;
 
     ImGui::NewLine();
 
     auto fname = Explorer::filename_from_entry_name(entry.name);
     ImGui::TextWrapped("Name: %.*s", int(fname.length()), fname.data());
+
+    if (entry.type == fs::Node::Type::Directory)
+        return;
 
     auto [size, suffix] = utils::to_human_size(entry.size);
     ImGui::Text("Size: %.2f%s", size, suffix.data());
