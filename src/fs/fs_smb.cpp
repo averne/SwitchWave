@@ -70,7 +70,7 @@ SmbFs::SmbFs(Context &context, std::string_view name, std::string_view mount_nam
     this->devoptab = {
         .name         = this->name.data(),
 
-        .structSize   = sizeof(SmbFs),
+        .structSize   = sizeof(SmbFsFile),
         .open_r       = SmbFs::smb_open,
         .close_r      = SmbFs::smb_close,
         .read_r       = SmbFs::smb_read,
@@ -80,7 +80,7 @@ SmbFs::SmbFs(Context &context, std::string_view name, std::string_view mount_nam
         .stat_r       = SmbFs::smb_stat,
         .chdir_r      = SmbFs::smb_chdir,
 
-        .dirStateSize = sizeof(SmbFs),
+        .dirStateSize = sizeof(SmbFsDir),
         .diropen_r    = SmbFs::smb_diropen,
         .dirreset_r   = SmbFs::smb_dirreset,
         .dirnext_r    = SmbFs::smb_dirnext,

@@ -61,7 +61,7 @@ NfsFs::NfsFs(Context &context, std::string_view name, std::string_view mount_nam
     this->devoptab = {
         .name         = this->name.data(),
 
-        .structSize   = sizeof(NfsFs),
+        .structSize   = sizeof(NfsFsFile),
         .open_r       = NfsFs::nfs_open,
         .close_r      = NfsFs::nfs_close,
         .read_r       = NfsFs::nfs_read,
@@ -71,7 +71,7 @@ NfsFs::NfsFs(Context &context, std::string_view name, std::string_view mount_nam
         .stat_r       = NfsFs::nfs_stat,
         .chdir_r      = NfsFs::nfs_chdir,
 
-        .dirStateSize = sizeof(NfsFs),
+        .dirStateSize = sizeof(NfsFsDir),
         .diropen_r    = NfsFs::nfs_diropen,
         .dirreset_r   = NfsFs::nfs_dirreset,
         .dirnext_r    = NfsFs::nfs_dirnext,
