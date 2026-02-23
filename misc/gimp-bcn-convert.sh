@@ -1,15 +1,12 @@
 #!/bin/bash
+# Usage: file-in file-out
+
 set -eo pipefail
-# file-in file-out
 
 if ! [ -x "$(command -v gimp)" ]; then
     echo "Error: gimp not found" >&2
     exit 1
 fi
-
-# serialize to avoid race conditions
-exec 9>/tmp/.gimp-bcn-convert.lock
-flock 9
 
 IFS='-*' read -r NAME WIDTH HEIGHT COMP < <(basename $1 | cut -d '.' -f 1)
 
@@ -17,8 +14,7 @@ GIMP_MAJOR=$(gimp --version 2>&1 | grep -oP '\d+' | head -1)
 
 if [ "$GIMP_MAJOR" -ge 3 ] 2>/dev/null; then
     # GIMP 3: uses gimp-console with keyword arguments and file-dds-export
-    TMPPATH=$(mktemp --suffix=.dds)
-    trap 'rm -f "$TMPPATH"' EXIT
+    TMPPATH=$(mktemp --suffix=.dds /tmp/"$NAME"_XXXXXXXXX)
 
     if ! gimp-console -n -i -c --batch-interpreter=plug-in-script-fu-eval -b "
         (let* (
