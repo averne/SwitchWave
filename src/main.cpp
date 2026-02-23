@@ -36,6 +36,7 @@
 #include "fs/fs_common.hpp"
 #include "fs/fs_ums.hpp"
 #include "fs/fs_recent.hpp"
+#include "fs/fs_http.hpp"
 
 using namespace std::chrono_literals;
 
@@ -240,7 +241,17 @@ int video_loop(sw::Renderer &renderer, sw::Context &context) {
 
     auto lk = std::scoped_lock(g_setup_mtx);
 
-    lmpv.command("loadfile", context.cur_file.c_str());
+    // For HTTP filesystems, pass the full HTTP URL directly to mpv
+    std::string loadfile_path = context.cur_file;
+    if (auto *fs = context.get_filesystem(sw::fs::Path::mountpoint(context.cur_file));
+            fs && fs->type == sw::fs::Filesystem::Type::Network) {
+        auto *net_fs = static_cast<const sw::fs::NetworkFilesystem *>(fs);
+        if (net_fs->protocol == sw::fs::NetworkFilesystem::Protocol::Http ||
+                net_fs->protocol == sw::fs::NetworkFilesystem::Protocol::Https)
+            loadfile_path = static_cast<const sw::fs::HttpFs *>(net_fs)->make_url(context.cur_file);
+    }
+
+    lmpv.command("loadfile", loadfile_path.c_str());
 
     auto player_ui = std::make_unique<sw::ui::PlayerGui>(renderer, context, lmpv);
 

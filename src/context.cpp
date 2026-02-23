@@ -25,6 +25,7 @@
 #include "fs/fs_smb.hpp"
 #include "fs/fs_nfs.hpp"
 #include "fs/fs_sftp.hpp"
+#include "fs/fs_http.hpp"
 
 #include "context.hpp"
 
@@ -70,7 +71,9 @@ int Context::read_from_file() {
 
             if (n == "protocol")
                 info->protocol = (v == "smb" ? fs::NetworkFilesystem::Protocol::Smb :
-                    (v == "nfs" ? fs::NetworkFilesystem::Protocol::Nfs : fs::NetworkFilesystem::Protocol::Sftp));
+                    (v == "nfs" ? fs::NetworkFilesystem::Protocol::Nfs :
+                    (v == "http" ? fs::NetworkFilesystem::Protocol::Http :
+                    (v == "https" ? fs::NetworkFilesystem::Protocol::Https : fs::NetworkFilesystem::Protocol::Sftp))));
             else if (n == "connect")
                 info->want_connect = v != "no";
             else if (n == "share")
@@ -152,9 +155,15 @@ int Context::register_network_fs(NetworkFsInfo &info) {
         case fs::NetworkFilesystem::Protocol::Sftp:
             fs = std::make_shared<fs::SftpFs>(*this, info.fs_name, info.mountpoint);
             break;
+        case fs::NetworkFilesystem::Protocol::Http:
+        case fs::NetworkFilesystem::Protocol::Https:
+            fs = std::make_shared<fs::HttpFs>(*this, info.fs_name, info.mountpoint);
+            break;
         default:
             return -1;
     }
+
+    fs->protocol = info.protocol;
 
     if (auto rc = fs->initialize(); rc)
         return rc;

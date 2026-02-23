@@ -177,6 +177,8 @@ class NetworkFilesystem: public Filesystem {
             Smb,
             Nfs,
             Sftp,
+            Http,
+            Https,
             ProtocolMax,
         };
 
@@ -201,8 +203,15 @@ class NetworkFilesystem: public Filesystem {
                     return "nfs";
                 case Protocol::Sftp:
                     return "sftp";
+                case Protocol::Http:
+                    return "http";
+                case Protocol::Https:
+                    return "https";
             }
         }
+
+    public:
+        Protocol protocol = Protocol::Smb;
 
     protected:
         bool is_connected = false;
