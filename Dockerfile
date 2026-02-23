@@ -2,13 +2,23 @@ FROM devkitpro/devkita64:20260215
 
 SHELL ["/bin/bash", "-c"]
 
+ARG GIMP_VERSION=2
+
 # Build tools + GIMP (for BCn texture conversion)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN if [ "$GIMP_VERSION" = "3" ]; then \
+        echo 'deb http://deb.debian.org/debian trixie main' > /etc/apt/sources.list.d/trixie.list \
+        && printf 'Package: *\nPin: release n=trixie\nPin-Priority: 100\n' > /etc/apt/preferences.d/trixie; \
+    fi \
+    && apt-get update && apt-get install -y --no-install-recommends \
     autoconf automake libtool \
     bison flex \
-    python3-pip python3-mako ninja-build \
+    python3-pip ninja-build \
     wget ca-certificates \
-    gimp \
+    && if [ "$GIMP_VERSION" = "3" ]; then \
+        apt-get install -y -t trixie --no-install-recommends gimp python3-mako; \
+    else \
+        apt-get install -y --no-install-recommends gimp python3-mako; \
+    fi \
     && pip3 install --break-system-packages meson \
     && rm -rf /var/lib/apt/lists/*
 

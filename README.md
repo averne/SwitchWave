@@ -40,10 +40,9 @@ A hardware-accelerated media player for the Nintendo Switch, built on mpv and FF
 ```
 This builds the toolchain image and compiles everything automatically. Output will be found in `build/`.
 
-To test with GIMP 3 instead of the default GIMP 2, use `Dockerfile.gimp3`:
+To build with GIMP 3 instead of the default GIMP 2:
 ```sh
-docker build -f Dockerfile.gimp3 -t switchwave-builder .
-./build-docker.sh
+GIMP_VERSION=3 ./build-docker.sh
 ```
 
 ### Manual

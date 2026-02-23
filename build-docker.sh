@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-docker build  -t switchwave-builder .
+docker build --build-arg GIMP_VERSION="${GIMP_VERSION:-2}" -t switchwave-builder .
 
 docker run --rm --name devkitpro-switchwave \
     -v "$(pwd)":/mnt/ \
