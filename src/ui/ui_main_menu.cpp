@@ -248,6 +248,7 @@ void MediaExplorer::metadata_thread_fn(std::stop_token token) {
                         net_fs->protocol == fs::NetworkFilesystem::Protocol::Https) {
                     path = static_cast<const fs::HttpFs *>(net_fs)->make_url(entry_path);
                     av_dict_set(&format_opts, "auth_type", "basic", 0);
+                    av_dict_set(&format_opts, "user_agent", "SwitchWave/1.0", 0);
                 }
             }
 

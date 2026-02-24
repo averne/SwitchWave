@@ -31,6 +31,7 @@ int LibmpvController::initialize() {
 
     MPV_CALL(mpv_set_option_string(this->mpv, "config", "yes"));
     MPV_CALL(mpv_set_option_string(this->mpv, "config-dir", LibmpvController::MpvDirectory.data()));
+    MPV_CALL(mpv_set_option_string(this->mpv, "user-agent", "SwitchWave/1.0"));
 
     MPV_CALL(mpv_initialize(this->mpv));
 
