@@ -20,6 +20,7 @@ FFMPEG_CONFIG           :=  --enable-asm \
 							--disable-muxers \
 							--target-os=horizon --enable-cross-compile \
                             --cross-prefix=aarch64-none-elf- --arch=aarch64 --cpu=cortex-a57 --enable-neon \
+                            --enable-mbedtls --enable-version3 \
                             --enable-pic --disable-autodetect --disable-runtime-cpudetect --disable-debug
 
 MPV_CONFIG              :=  --enable-libmpv-static --disable-libmpv-shared --disable-manpage-build \
@@ -37,7 +38,7 @@ BUILD                   :=  build
 ROMFS                   :=  $(BUILD)/romfs
 INSTALL                 :=  $(TOPDIR)/$(BUILD)/install
 PACKAGES                :=  mpv libavcodec libavformat libavfilter libavutil libswscale libswresample \
-                            uam libsmb2 libnfs libssh2 freetype2 libarchive
+                            uam libsmb2 libnfs libssh2 libcurl freetype2 libarchive
 LIBDIRS                 :=  $(INSTALL)
 
 DEFINES                 :=  __SWITCH__ _GNU_SOURCE _POSIX_VERSION=200809L timegm=mktime \

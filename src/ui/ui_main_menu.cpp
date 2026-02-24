@@ -42,6 +42,7 @@ extern "C" {
 
 #include "utils.hpp"
 #include "fs/fs_recent.hpp"
+#include "fs/fs_http.hpp"
 
 #include "ui/ui_main_menu.hpp"
 
@@ -234,15 +235,33 @@ void MediaExplorer::metadata_thread_fn(std::stop_token token) {
         MediaMetadata media_info = {};
 
         if (entry) {
+            auto entry_path = Explorer::path_from_entry_name(entry->name);
+
+            // For HTTP filesystems, pass the URL directly to avformat (ffmpeg supports HTTP natively)
+            std::string path;
+            AVDictionary *format_opts = nullptr;
+            SW_SCOPEGUARD([&format_opts] { av_dict_free(&format_opts); });
+            if (auto *fs_ptr = this->context.get_filesystem(fs::Path::mountpoint(entry_path));
+                    fs_ptr && fs_ptr->type == fs::Filesystem::Type::Network) {
+                auto *net_fs = static_cast<const fs::NetworkFilesystem *>(fs_ptr);
+                if (net_fs->protocol == fs::NetworkFilesystem::Protocol::Http ||
+                        net_fs->protocol == fs::NetworkFilesystem::Protocol::Https) {
+                    path = static_cast<const fs::HttpFs *>(net_fs)->make_url(entry_path);
+                    av_dict_set(&format_opts, "auth_type", "basic", 0);
+                    av_dict_set(&format_opts, "user_agent", "SwitchWave/1.0", 0);
+                }
+            }
+
             // Add explicit protocol prefix, otherwise ffmpeg confuses the mountpoint for a protocol
-            auto path = std::string("file:") + Explorer::path_from_entry_name(entry->name).data();
+            if (path.empty())
+                path = std::string("file:") + entry_path.data();
 
             auto *avformat_ctx = avformat_alloc_context();
             SW_SCOPEGUARD([&avformat_ctx] { avformat_close_input(&avformat_ctx); });
             if (!avformat_ctx)
                 goto end;
 
-            if (auto rc = avformat_open_input(&avformat_ctx, path.c_str(), nullptr, nullptr); rc) {
+            if (auto rc = avformat_open_input(&avformat_ctx, path.c_str(), nullptr, &format_opts); rc) {
                 char buf[AV_ERROR_MAX_STRING_SIZE];
                 std::printf("Failed to open input %s: %s\n", path.c_str(), av_make_error_string(buf, sizeof(buf), rc));
                 this->context.set_error(rc, Context::ErrorType::LibAv);
@@ -357,13 +376,14 @@ void MediaExplorer::render() {
         return;
 
     auto &entry = this->explorer.entries[ent_idx];
-    if (entry.type == fs::Node::Type::Directory)
-        return;
 
     ImGui::NewLine();
 
     auto fname = Explorer::filename_from_entry_name(entry.name);
     ImGui::TextWrapped("Name: %.*s", int(fname.length()), fname.data());
+
+    if (entry.type == fs::Node::Type::Directory)
+        return;
 
     auto [size, suffix] = utils::to_human_size(entry.size);
     ImGui::Text("Size: %.2f%s", size, suffix.data());
