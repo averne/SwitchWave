@@ -29,6 +29,39 @@ namespace sw::fs {
 
 namespace {
 
+int ssh2_translate_addrinfo_error(int error) {
+    switch (error) {
+        case 0:
+            return 0;
+        default:
+            return EIO;
+        case EAI_SYSTEM:
+            return errno ? errno : EIO;
+        case EAI_AGAIN:
+            return EAGAIN;
+        case EAI_BADFLAGS:
+            return EINVAL;
+        case EAI_FAIL:
+            return EHOSTUNREACH;
+        case EAI_FAMILY:
+            return EAFNOSUPPORT;
+        case EAI_MEMORY:
+            return ENOMEM;
+        case EAI_NONAME:
+            return ENOENT;
+        case EAI_SERVICE:
+            return EPROTONOSUPPORT;
+        case EAI_SOCKTYPE:
+            return ENOTSUP;
+        case EAI_BADHINTS:
+            return EINVAL;
+        case EAI_PROTOCOL:
+            return EPROTONOSUPPORT;
+        case EAI_OVERFLOW:
+            return ENAMETOOLONG;
+    }
+}
+
 int ssh2_translate_error(int error, LIBSSH2_SFTP *sftp_session) {
     switch (error) {
         case LIBSSH2_ERROR_NONE:
@@ -205,8 +238,8 @@ int SftpFs::connect(std::string_view host, std::uint16_t port, std::string_view 
     struct addrinfo *ai = nullptr;
     SW_SCOPEGUARD([&ai] { ::freeaddrinfo(ai); });
 
-    if (auto rc = ::getaddrinfo(host.data(), nullptr, nullptr, &ai))
-        return rc;
+    if (auto rc = ::getaddrinfo(host.data(), nullptr, nullptr, &ai); rc)
+        return ssh2_translate_addrinfo_error(rc);
 
     this->sock = ::socket(AF_INET, SOCK_STREAM, 0);
     if (this->sock < 0)
