@@ -239,12 +239,16 @@ void MediaExplorer::metadata_thread_fn(std::stop_token token) {
 
             // For HTTP filesystems, pass the URL directly to avformat (ffmpeg supports HTTP natively)
             std::string path;
+            AVDictionary *format_opts = nullptr;
+            SW_SCOPEGUARD([&format_opts] { av_dict_free(&format_opts); });
             if (auto *fs_ptr = this->context.get_filesystem(fs::Path::mountpoint(entry_path));
                     fs_ptr && fs_ptr->type == fs::Filesystem::Type::Network) {
                 auto *net_fs = static_cast<const fs::NetworkFilesystem *>(fs_ptr);
                 if (net_fs->protocol == fs::NetworkFilesystem::Protocol::Http ||
-                        net_fs->protocol == fs::NetworkFilesystem::Protocol::Https)
+                        net_fs->protocol == fs::NetworkFilesystem::Protocol::Https) {
                     path = static_cast<const fs::HttpFs *>(net_fs)->make_url(entry_path);
+                    av_dict_set(&format_opts, "auth_type", "basic", 0);
+                }
             }
 
             // Add explicit protocol prefix, otherwise ffmpeg confuses the mountpoint for a protocol
@@ -256,7 +260,7 @@ void MediaExplorer::metadata_thread_fn(std::stop_token token) {
             if (!avformat_ctx)
                 goto end;
 
-            if (auto rc = avformat_open_input(&avformat_ctx, path.c_str(), nullptr, nullptr); rc) {
+            if (auto rc = avformat_open_input(&avformat_ctx, path.c_str(), nullptr, &format_opts); rc) {
                 char buf[AV_ERROR_MAX_STRING_SIZE];
                 std::printf("Failed to open input %s: %s\n", path.c_str(), av_make_error_string(buf, sizeof(buf), rc));
                 this->context.set_error(rc, Context::ErrorType::LibAv);
