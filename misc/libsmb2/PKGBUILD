@@ -1,5 +1,5 @@
 pkgname=switch-libsmb2
-pkgver=4.0.0
+pkgver=6.0.0
 pkgrel=1
 pkgdesc="SMB2/3 userspace client"
 url="https://github.com/sahlberg/libsmb2"
@@ -7,15 +7,17 @@ license=('LGPL')
 arch=('any')
 options=(!strip libtool staticlibs)
 groups=('switch-portlibs')
-source=("${url}/archive/refs/tags/v${pkgver}.tar.gz" "switch.patch")
+source=("${url}/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=(
-  'b4d1b13bc07adc68379a72f723b9032a950afd62fed7f2aa3e57f3421406da11'
-  '151d92ffdc8a8dce581baf7cc6f10e4096fd73497da172aaaee8e02d7d690d4b'
+  'c65a7a2b7a6e967a4fd5b6168fca4f1f7d0362a3510767700609c770e3ead1e8'
 )
 
 prepare() {
   cd "libsmb2-${pkgver}"
-  patch -Np1 -i "$srcdir/switch.patch"
+
+  source ${DEVKITPRO}/switchvars.sh
+
+  cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=${DEVKITPRO}/cmake/Switch.cmake"
 }
 
 build() {
@@ -23,12 +25,7 @@ build() {
 
   source ${DEVKITPRO}/switchvars.sh
 
-  ./bootstrap
-
-  ./configure --prefix="${PORTLIBS_PREFIX}" --host=aarch64-none-elf \
-    --disable-shared --enable-static --without-libkrb5 --disable-werror
-
-  make
+  make -C build
 }
 
 package() {
@@ -36,6 +33,6 @@ package() {
 
   source /opt/devkitpro/switchvars.sh
 
-  make DESTDIR="${pkgdir}" install
+  make -C build DESTDIR="${pkgdir}" install
   install -Dm644 COPYING "${pkgdir}/opt/devkitpro/portlibs/switch/licenses/${pkgname}/LICENSE"
 }
