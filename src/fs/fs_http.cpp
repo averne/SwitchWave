@@ -17,9 +17,9 @@
 
 #include <cstdio>
 #include <cstring>
+#include <new>
 #include <string>
 #include <string_view>
-#include <vector>
 #include <sys/syslimits.h>
 
 #include <curl/curl.h>
@@ -29,16 +29,6 @@
 namespace sw::fs {
 
 namespace {
-
-struct DirEntry {
-    std::string href;
-    bool is_dir;
-};
-
-struct DirData {
-    std::vector<DirEntry> entries;
-    std::size_t index = 0;
-};
 
 std::size_t string_write_cb(char *ptr, std::size_t size, std::size_t nmemb, void *userdata) {
     auto *str = static_cast<std::string *>(userdata);
@@ -86,7 +76,7 @@ std::string url_encode_path(std::string_view s) {
     return result;
 }
 
-void parse_autoindex(std::string_view html, std::vector<DirEntry> &entries) {
+void parse_autoindex(std::string_view html, std::vector<HttpFs::DirEntry> &entries) {
     // Narrow search to <table> or <body> if present
     auto body = html;
     if (auto pos = html.find("<table"); pos != std::string_view::npos)
@@ -150,7 +140,7 @@ HttpFs::HttpFs(Context &context, std::string_view name, std::string_view mount_n
     this->devoptab = {
         .name         = this->name.data(),
 
-        .structSize   = sizeof(HttpFs),
+        .structSize   = 0,
         .open_r       = HttpFs::http_open,
         .close_r      = HttpFs::http_close,
         .read_r       = HttpFs::http_read,
@@ -159,7 +149,7 @@ HttpFs::HttpFs(Context &context, std::string_view name, std::string_view mount_n
 
         .stat_r       = HttpFs::http_stat,
 
-        .dirStateSize = sizeof(HttpFs),
+        .dirStateSize = sizeof(HttpFsDir),
         .diropen_r    = HttpFs::http_diropen,
         .dirreset_r   = HttpFs::http_dirreset,
         .dirnext_r    = HttpFs::http_dirnext,
@@ -179,10 +169,8 @@ HttpFs::~HttpFs() {
 }
 
 int HttpFs::initialize() {
-    if (HttpFs::lib_refcount++ == 0) {
-        if (auto rc = ::curl_global_init(CURL_GLOBAL_DEFAULT); rc)
-            return EIO;
-    }
+    if (auto rc = ::curl_global_init(CURL_GLOBAL_DEFAULT); rc)
+        return EIO;
 
     return 0;
 }
@@ -193,21 +181,23 @@ int HttpFs::connect(std::string_view host, std::uint16_t port, std::string_view 
     auto scheme = is_https ? "https://" : "http://";
     auto default_port = is_https ? std::uint16_t(443) : std::uint16_t(80);
 
-    // Build base URL: http(s)://host:port/share/
-    this->base_url = scheme;
-    this->base_url += host;
+    // Build host[:port] string
+    auto host_port = std::string(host);
     if (port && port != default_port) {
-        this->base_url += ':';
-        this->base_url += std::to_string(port);
+        host_port += ':';
+        host_port += std::to_string(port);
     }
-    this->base_url += '/';
-    if (!share.empty()) {
-        if (share.front() == '/')
-            share = share.substr(1);
-        this->base_url += share;
-        if (this->base_url.back() != '/')
-            this->base_url += '/';
-    }
+
+    while (!share.empty() && share.front() == '/')
+        share.remove_prefix(1);
+    while (!share.empty() && share.back() == '/')
+        share.remove_suffix(1);
+
+    // Build base URL: http(s)://host:port[/share]
+    auto base = Path(std::string(scheme) + host_port);
+    if (!share.empty())
+        base /= Path(std::string(share));
+    this->base_url = base.base();
 
     // Store credentials for curl operations
     this->userpwd.clear();
@@ -218,24 +208,19 @@ int HttpFs::connect(std::string_view host, std::uint16_t port, std::string_view 
     }
 
     // Build auth URL prefix with embedded credentials for make_url()
-    this->auth_url_prefix = scheme;
+    std::string auth_authority = scheme;
     if (!username.empty()) {
-        this->auth_url_prefix += username;
-        this->auth_url_prefix += ':';
-        this->auth_url_prefix += password;
-        this->auth_url_prefix += '@';
+        auth_authority += username;
+        auth_authority += ':';
+        auth_authority += password;
+        auth_authority += '@';
     }
-    this->auth_url_prefix += host;
-    if (port && port != default_port) {
-        this->auth_url_prefix += ':';
-        this->auth_url_prefix += std::to_string(port);
-    }
-    this->auth_url_prefix += '/';
-    if (!share.empty()) {
-        this->auth_url_prefix += share;
-        if (this->auth_url_prefix.back() != '/')
-            this->auth_url_prefix += '/';
-    }
+    auth_authority += host_port;
+
+    auto auth_base = Path(std::move(auth_authority));
+    if (!share.empty())
+        auth_base /= Path(std::string(share));
+    this->auth_url_prefix = auth_base.base();
 
     // Test connection with HEAD request
     auto *curl = ::curl_easy_init();
@@ -264,13 +249,9 @@ int HttpFs::connect(std::string_view host, std::uint16_t port, std::string_view 
 int HttpFs::disconnect() {
     auto lk = std::scoped_lock(this->session_mutex);
 
-    this->base_url.clear();
-    this->userpwd.clear();
-    this->auth_url_prefix.clear();
     this->is_connected = false;
 
-    if (--HttpFs::lib_refcount == 0)
-        ::curl_global_cleanup();
+    ::curl_global_cleanup();
 
     return 0;
 }
@@ -295,12 +276,7 @@ std::string HttpFs::translate_path(const char *path) {
 }
 
 std::string HttpFs::make_url(std::string_view path) const {
-    // path is like "mountname:/some/dir/file.mkv", strip mountpoint
     auto internal = Path::internal(path);
-    // Skip leading slash
-    if (!internal.empty() && internal.front() == '/')
-        internal = internal.substr(1);
-
     return this->auth_url_prefix + url_encode_path(internal);
 }
 
@@ -334,8 +310,7 @@ int HttpFs::http_stat(struct _reent *r, const char *file, struct stat *st) {
     auto *priv = static_cast<HttpFs *>(r->deviceData);
 
     auto internal_path = priv->translate_path(file);
-    // Build full URL for stat
-    auto url = priv->base_url + url_encode_path(std::string_view(internal_path).substr(1));
+    auto url = priv->base_url + url_encode_path(internal_path);
 
     auto lk = std::scoped_lock(priv->session_mutex);
 
@@ -361,30 +336,32 @@ int HttpFs::http_stat(struct _reent *r, const char *file, struct stat *st) {
 
     *st = {};
 
-    if (http_code == 200) {
-        // Check content-length
-        curl_off_t cl = -1;
-        ::curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &cl);
-        st->st_size = (cl >= 0) ? cl : 0;
-        st->st_mode = S_IFREG;
-    } else if (http_code == 301 || http_code == 302) {
-        st->st_mode = S_IFDIR;
-    } else if (http_code == 404) {
-        ::curl_easy_cleanup(curl);
-        __errno_r(r) = ENOENT;
-        return -1;
-    } else if (http_code == 403) {
-        ::curl_easy_cleanup(curl);
-        __errno_r(r) = EACCES;
-        return -1;
-    } else {
-        ::curl_easy_cleanup(curl);
-        __errno_r(r) = EIO;
-        return -1;
+    int ret = 0;
+    switch (http_code) {
+        case 200: {
+            curl_off_t cl = -1;
+            ::curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &cl);
+            st->st_size = (cl >= 0) ? cl : 0;
+            st->st_mode = S_IFREG;
+            break;
+        }
+        case 301:
+        case 302:
+            st->st_mode = S_IFDIR;
+            break;
+        case 404:
+            __errno_r(r) = ENOENT, ret = -1;
+            break;
+        case 403:
+            __errno_r(r) = EACCES, ret = -1;
+            break;
+        default:
+            __errno_r(r) = EIO, ret = -1;
+            break;
     }
 
     ::curl_easy_cleanup(curl);
-    return 0;
+    return ret;
 }
 
 int HttpFs::http_lstat(struct _reent *r, const char *file, struct stat *st) {
@@ -395,10 +372,11 @@ DIR_ITER *HttpFs::http_diropen(struct _reent *r, DIR_ITER *dirState, const char 
     auto *priv     = static_cast<HttpFs    *>(r->deviceData);
     auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
 
+    priv_dir->entries = nullptr;
+    priv_dir->index = 0;
+
     auto internal_path = priv->translate_path(path);
-    auto url = priv->base_url;
-    if (internal_path.size() > 1)
-        url += url_encode_path(std::string_view(internal_path).substr(1));
+    auto url = priv->base_url + url_encode_path(internal_path);
     if (url.back() != '/')
         url += '/';
 
@@ -425,33 +403,48 @@ DIR_ITER *HttpFs::http_diropen(struct _reent *r, DIR_ITER *dirState, const char 
         return nullptr;
     }
 
-    auto *dir_data = new DirData();
-    parse_autoindex(html, dir_data->entries);
+    auto *entries = new(std::nothrow) std::vector<DirEntry>;
+    if (!entries) {
+        __errno_r(r) = ENOMEM;
+        return nullptr;
+    }
 
-    priv_dir->data = dir_data;
+    parse_autoindex(html, *entries);
+
+    priv_dir->entries = entries;
+    priv_dir->index = 0;
+
     return dirState;
 }
 
 int HttpFs::http_dirreset(struct _reent *r, DIR_ITER *dirState) {
     auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
-    auto *dir_data = static_cast<DirData *>(priv_dir->data);
 
-    if (dir_data)
-        dir_data->index = 0;
+    if (!priv_dir->entries) {
+        __errno_r(r) = EINVAL;
+        return -1;
+    }
+
+    priv_dir->index = 0;
 
     return 0;
 }
 
 int HttpFs::http_dirnext(struct _reent *r, DIR_ITER *dirState, char *filename, struct stat *filestat) {
     auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
-    auto *dir_data = static_cast<DirData *>(priv_dir->data);
+    auto *entries = priv_dir->entries;
 
-    if (!dir_data || dir_data->index >= dir_data->entries.size()) {
+    if (!entries) {
+        __errno_r(r) = EINVAL;
+        return -1;
+    }
+
+    if (priv_dir->index >= entries->size()) {
         __errno_r(r) = ENOENT;
         return -1;
     }
 
-    auto &entry = dir_data->entries[dir_data->index++];
+    auto &entry = (*entries)[priv_dir->index++];
     std::strncpy(filename, entry.href.c_str(), NAME_MAX);
 
     *filestat = {};
@@ -463,8 +456,9 @@ int HttpFs::http_dirnext(struct _reent *r, DIR_ITER *dirState, char *filename, s
 int HttpFs::http_dirclose(struct _reent *r, DIR_ITER *dirState) {
     auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
 
-    delete static_cast<DirData *>(priv_dir->data);
-    priv_dir->data = nullptr;
+    delete priv_dir->entries;
+    priv_dir->entries = nullptr;
+    priv_dir->index = 0;
 
     return 0;
 }

@@ -17,10 +17,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "context.hpp"
 #include "fs/fs_common.hpp"
@@ -39,6 +39,11 @@ class HttpFs final: public NetworkFilesystem {
 
         std::string make_url(std::string_view path) const;
 
+        struct DirEntry {
+            std::string href;
+            bool is_dir;
+        };
+
     private:
         std::string translate_path(const char *path);
         void setup_curl_handle(void *curl);
@@ -55,14 +60,12 @@ class HttpFs final: public NetworkFilesystem {
         static int       http_dirclose(struct _reent *r, DIR_ITER *dirState);
         static int       http_lstat   (struct _reent *r, const char *file, struct stat *st);
 
-    private:
         struct HttpFsDir {
-            void *data;
+            std::vector<DirEntry> *entries;
+            std::size_t index;
         };
 
     private:
-        static inline std::atomic_int lib_refcount = 0;
-
         Context &context;
 
         std::string base_url;
