@@ -17,7 +17,7 @@
 
 #include <cstdio>
 #include <cstring>
-#include <new>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <sys/syslimits.h>
@@ -369,10 +369,8 @@ int HttpFs::http_lstat(struct _reent *r, const char *file, struct stat *st) {
 }
 
 DIR_ITER *HttpFs::http_diropen(struct _reent *r, DIR_ITER *dirState, const char *path) {
-    auto *priv     = static_cast<HttpFs    *>(r->deviceData);
-    auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
-
-    priv_dir->entries = nullptr;
+    auto *priv = static_cast<HttpFs *>(r->deviceData);
+    auto *priv_dir = std::construct_at(reinterpret_cast<HttpFsDir *>(dirState->dirStruct));
     priv_dir->index = 0;
 
     auto internal_path = priv->translate_path(path);
@@ -384,6 +382,7 @@ DIR_ITER *HttpFs::http_diropen(struct _reent *r, DIR_ITER *dirState, const char 
 
     auto *curl = ::curl_easy_init();
     if (!curl) {
+        std::destroy_at(priv_dir);
         __errno_r(r) = ENOMEM;
         return nullptr;
     }
@@ -399,32 +398,18 @@ DIR_ITER *HttpFs::http_diropen(struct _reent *r, DIR_ITER *dirState, const char 
     ::curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
+        std::destroy_at(priv_dir);
         __errno_r(r) = EIO;
         return nullptr;
     }
 
-    auto *entries = new(std::nothrow) std::vector<DirEntry>;
-    if (!entries) {
-        __errno_r(r) = ENOMEM;
-        return nullptr;
-    }
-
-    parse_autoindex(html, *entries);
-
-    priv_dir->entries = entries;
-    priv_dir->index = 0;
+    parse_autoindex(html, priv_dir->entries);
 
     return dirState;
 }
 
 int HttpFs::http_dirreset(struct _reent *r, DIR_ITER *dirState) {
     auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
-
-    if (!priv_dir->entries) {
-        __errno_r(r) = EINVAL;
-        return -1;
-    }
-
     priv_dir->index = 0;
 
     return 0;
@@ -432,19 +417,13 @@ int HttpFs::http_dirreset(struct _reent *r, DIR_ITER *dirState) {
 
 int HttpFs::http_dirnext(struct _reent *r, DIR_ITER *dirState, char *filename, struct stat *filestat) {
     auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
-    auto *entries = priv_dir->entries;
 
-    if (!entries) {
-        __errno_r(r) = EINVAL;
-        return -1;
-    }
-
-    if (priv_dir->index >= entries->size()) {
+    if (priv_dir->index >= priv_dir->entries.size()) {
         __errno_r(r) = ENOENT;
         return -1;
     }
 
-    auto &entry = (*entries)[priv_dir->index++];
+    auto &entry = priv_dir->entries[priv_dir->index++];
     std::strncpy(filename, entry.href.c_str(), NAME_MAX);
 
     *filestat = {};
@@ -454,11 +433,8 @@ int HttpFs::http_dirnext(struct _reent *r, DIR_ITER *dirState, char *filename, s
 }
 
 int HttpFs::http_dirclose(struct _reent *r, DIR_ITER *dirState) {
-    auto *priv_dir = static_cast<HttpFsDir *>(dirState->dirStruct);
-
-    delete priv_dir->entries;
-    priv_dir->entries = nullptr;
-    priv_dir->index = 0;
+    auto *priv_dir = reinterpret_cast<HttpFsDir *>(dirState->dirStruct);
+    std::destroy_at(priv_dir);
 
     return 0;
 }

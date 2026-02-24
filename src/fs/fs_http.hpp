@@ -61,7 +61,7 @@ class HttpFs final: public NetworkFilesystem {
         static int       http_lstat   (struct _reent *r, const char *file, struct stat *st);
 
         struct HttpFsDir {
-            std::vector<DirEntry> *entries;
+            std::vector<DirEntry> entries;
             std::size_t index;
         };
 
