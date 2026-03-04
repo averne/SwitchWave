@@ -5,7 +5,7 @@ endif
 APP_TITLE               :=  SwitchWave
 APP_AUTHOR              :=  averne
 APP_ICON                :=  icon.jpg
-APP_VERSION             :=  1.0.2
+APP_VERSION             :=  1.1.0
 APP_COMMIT              :=  $(shell git rev-parse --short HEAD)
 
 FFMPEG_CONFIG           :=  --enable-asm \
