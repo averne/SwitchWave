@@ -1,3 +1,35 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="center">
+        <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=en">English</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=zh-CN">简体中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=zh-TW">繁體中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=ja">日本語</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=ko">한국어</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=hi">हिन्दी</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=th">ไทย</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=fr">Français</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=de">Deutsch</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=es">Español</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=it">Italiano</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=ru">Русский</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=pt">Português</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=nl">Nederlands</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=pl">Polski</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=ar">العربية</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=fa">فارسی</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=tr">Türkçe</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=vi">Tiếng Việt</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=id">Bahasa Indonesia</a>
+        | <a href="https://openaitx.github.io/view.html?user=averne&project=SwitchWave&lang=as">অসমীয়া</
+      </div>
+    </div>
+  </details>
+</div>
+
 # <img src="https://github.com/user-attachments/assets/b81b9503-948e-4cba-b0a1-f5f809588aad" width="48"> SwitchWave
 A hardware-accelerated media player for the Nintendo Switch, built on mpv and FFmpeg.
 
