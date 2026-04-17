@@ -12,6 +12,12 @@ IFS='-*' read -r NAME WIDTH HEIGHT COMP < <(basename $1 | cut -d '.' -f 1)
 
 GIMP_MAJOR=$(gimp --version 2>&1 | grep -oP '\d+' | head -1)
 
+# Isolate per-user config dir so parallel invocations don't race on first-run init
+GIMP_DIR=$(mktemp -d /tmp/gimp-bcn-XXXXXXXXX)
+trap 'rm -rf "$GIMP_DIR"' EXIT
+export GIMP2_DIRECTORY="$GIMP_DIR"
+export GIMP3_DIRECTORY="$GIMP_DIR"
+
 if [ "$GIMP_MAJOR" -ge 3 ] 2>/dev/null; then
     # GIMP 3: uses gimp-console with keyword arguments and file-dds-export
     TMPPATH=$(mktemp --suffix=.dds /tmp/"$NAME"_XXXXXXXXX)
