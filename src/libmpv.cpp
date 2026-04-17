@@ -17,10 +17,47 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
+
+#include <switch.h>
 
 #include "libmpv.hpp"
 
 namespace sw {
+
+// Pull the system HTTP proxy out of libnx's network manager and forward it
+// to mpv. SwitchWave's own libcurl-based HTTP browser already honors the
+// system proxy, but mpv goes through ffmpeg's avio which has no auto
+// pickup, so video URLs fail with -13 (loading failed) on networks where
+// the proxy is the only path to the WAN.
+static void apply_system_http_proxy(mpv_handle *mpv) {
+    if (R_FAILED(nifmInitialize(NifmServiceType_User)))
+        return;
+    NifmNetworkProfileData profile;
+    Result rc = nifmGetCurrentNetworkProfile(&profile);
+    nifmExit();
+    if (R_FAILED(rc))
+        return;
+
+    auto &p = profile.ip_setting_data.proxy_setting;
+    if (!p.enabled || p.server[0] == '\0')
+        return;
+
+    std::string url = "http://";
+    if (p.auto_auth_enabled && p.user[0] != '\0') {
+        url += p.user;
+        url += ':';
+        url += p.password;
+        url += '@';
+    }
+    url += p.server;
+    url += ':';
+    url += std::to_string(p.port);
+
+    mpv_set_option_string(mpv, "http-proxy", url.c_str());
+    // mpv's https-proxy isn't a separate option; the same http-proxy is
+    // used for both. ffmpeg's lavf passes it through as the CONNECT proxy.
+}
 
 int LibmpvController::initialize() {
     this->mpv = mpv_create();
@@ -32,6 +69,8 @@ int LibmpvController::initialize() {
     MPV_CALL(mpv_set_option_string(this->mpv, "config", "yes"));
     MPV_CALL(mpv_set_option_string(this->mpv, "config-dir", LibmpvController::MpvDirectory.data()));
     MPV_CALL(mpv_set_option_string(this->mpv, "user-agent", "SwitchWave/1.0"));
+
+    apply_system_http_proxy(this->mpv);
 
     MPV_CALL(mpv_initialize(this->mpv));
 
