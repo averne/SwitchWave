@@ -28,6 +28,7 @@
 #include <imgui_deko3d.h>
 
 #include "utils.hpp"
+#include "fs/fs_http.hpp"
 #include "ui/ui_explorer.hpp"
 
 #include "ui/ui_player.hpp"
@@ -1572,17 +1573,21 @@ void PlayerMenu::render() {
     }
 
     if (!this->explorer.selection.empty()) {
+        // For HTTP filesystems, convert mount path to full URL for mpv
+        auto selection_path = sw::fs::try_make_http_url(this->context, this->explorer.selection.base())
+            .value_or(this->explorer.selection.base());
+
         switch (this->cur_subwindow) {
             case SubwindowType::ShaderFilepicker:
-                this->lmpv.command_async("change-list", "glsl-shaders", "append", this->explorer.selection.c_str());
+                this->lmpv.command_async("change-list", "glsl-shaders", "append", selection_path.c_str());
                 this->cur_subwindow = SubwindowType::VideoQuality;
                 break;
             case SubwindowType::SubtitleFilepicker:
-                this->lmpv.command_async("sub-add", this->explorer.selection.c_str());
+                this->lmpv.command_async("sub-add", selection_path.c_str());
                 this->cur_subwindow = SubwindowType::None;
                 break;
             case SubwindowType::PlaylistFilepicker:
-                this->lmpv.command_async("loadfile", this->explorer.selection.c_str(), "append");
+                this->lmpv.command_async("loadfile", selection_path.c_str(), "append");
                 this->cur_subwindow = SubwindowType::None;
                 break;
             default:

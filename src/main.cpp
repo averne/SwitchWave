@@ -244,14 +244,9 @@ int video_loop(sw::Renderer &renderer, sw::Context &context) {
     // For HTTP filesystems, pass the full HTTP URL directly to mpv
     std::string loadfile_path = context.cur_file;
     bool use_http_basic_preemptive_auth = false;
-    if (auto *fs = context.get_filesystem(sw::fs::Path::mountpoint(context.cur_file));
-            fs && fs->type == sw::fs::Filesystem::Type::Network) {
-        auto *net_fs = static_cast<const sw::fs::NetworkFilesystem *>(fs);
-        if (net_fs->protocol == sw::fs::NetworkFilesystem::Protocol::Http ||
-                net_fs->protocol == sw::fs::NetworkFilesystem::Protocol::Https) {
-            loadfile_path = static_cast<const sw::fs::HttpFs *>(net_fs)->make_url(context.cur_file);
-            use_http_basic_preemptive_auth = true;
-        }
+    if (auto url = sw::fs::try_make_http_url(context, context.cur_file)) {
+        loadfile_path = std::move(*url);
+        use_http_basic_preemptive_auth = true;
     }
 
     if (use_http_basic_preemptive_auth) {

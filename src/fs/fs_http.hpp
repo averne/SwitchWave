@@ -18,6 +18,7 @@
 #pragma once
 
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -76,5 +77,9 @@ class HttpFs final: public NetworkFilesystem {
 
         std::mutex session_mutex;
 };
+
+// If `path` lives on an HTTP(S) network mount, returns the equivalent
+// HTTP URL (with any embedded credentials) suitable for mpv/ffmpeg.
+std::optional<std::string> try_make_http_url(const Context &context, std::string_view path);
 
 } // namespace sw::fs

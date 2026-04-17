@@ -280,6 +280,17 @@ std::string HttpFs::make_url(std::string_view path) const {
     return this->auth_url_prefix + url_encode_path(internal);
 }
 
+std::optional<std::string> try_make_http_url(const Context &context, std::string_view path) {
+    auto *fs = context.get_filesystem(Path::mountpoint(path));
+    if (!fs || fs->type != Filesystem::Type::Network)
+        return std::nullopt;
+    auto *net_fs = static_cast<const NetworkFilesystem *>(fs);
+    if (net_fs->protocol != NetworkFilesystem::Protocol::Http &&
+            net_fs->protocol != NetworkFilesystem::Protocol::Https)
+        return std::nullopt;
+    return static_cast<const HttpFs *>(net_fs)->make_url(path);
+}
+
 // File operations: not supported, files are accessed via direct HTTP URL
 int HttpFs::http_open(struct _reent *r, void *fileStruct, const char *path, int flags, int mode) {
     __errno_r(r) = ENOSYS;

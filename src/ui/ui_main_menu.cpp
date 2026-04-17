@@ -241,15 +241,10 @@ void MediaExplorer::metadata_thread_fn(std::stop_token token) {
             std::string path;
             AVDictionary *format_opts = nullptr;
             SW_SCOPEGUARD([&format_opts] { av_dict_free(&format_opts); });
-            if (auto *fs_ptr = this->context.get_filesystem(fs::Path::mountpoint(entry_path));
-                    fs_ptr && fs_ptr->type == fs::Filesystem::Type::Network) {
-                auto *net_fs = static_cast<const fs::NetworkFilesystem *>(fs_ptr);
-                if (net_fs->protocol == fs::NetworkFilesystem::Protocol::Http ||
-                        net_fs->protocol == fs::NetworkFilesystem::Protocol::Https) {
-                    path = static_cast<const fs::HttpFs *>(net_fs)->make_url(entry_path);
-                    av_dict_set(&format_opts, "auth_type", "basic", 0);
-                    av_dict_set(&format_opts, "user_agent", "SwitchWave/1.0", 0);
-                }
+            if (auto url = fs::try_make_http_url(this->context, entry_path)) {
+                path = std::move(*url);
+                av_dict_set(&format_opts, "auth_type", "basic", 0);
+                av_dict_set(&format_opts, "user_agent", "SwitchWave/1.0", 0);
             }
 
             // Add explicit protocol prefix, otherwise ffmpeg confuses the mountpoint for a protocol
