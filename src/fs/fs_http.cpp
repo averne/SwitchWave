@@ -284,10 +284,12 @@ std::optional<std::string> try_make_http_url(const Context &context, std::string
     auto *fs = context.get_filesystem(Path::mountpoint(path));
     if (!fs || fs->type != Filesystem::Type::Network)
         return std::nullopt;
+
     auto *net_fs = static_cast<const NetworkFilesystem *>(fs);
     if (net_fs->protocol != NetworkFilesystem::Protocol::Http &&
             net_fs->protocol != NetworkFilesystem::Protocol::Https)
         return std::nullopt;
+
     return static_cast<const HttpFs *>(net_fs)->make_url(path);
 }
 

@@ -33,10 +33,10 @@ namespace sw {
 static void apply_system_http_proxy(mpv_handle *mpv) {
     if (R_FAILED(nifmInitialize(NifmServiceType_User)))
         return;
+    SW_SCOPEGUARD([] { nifmExit(); });
+
     NifmNetworkProfileData profile;
-    Result rc = nifmGetCurrentNetworkProfile(&profile);
-    nifmExit();
-    if (R_FAILED(rc))
+    if (auto rc = nifmGetCurrentNetworkProfile(&profile); R_FAILED(rc))
         return;
 
     auto &p = profile.ip_setting_data.proxy_setting;
