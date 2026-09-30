@@ -62,6 +62,7 @@ bool Explorer::update_state(PadState &pad, HidTouchScreenState &touch) {
         if (dir) {
             SW_SCOPEGUARD([dir] { closedir(dir); });
             this->entries.clear();
+            this->cur_focused_entry = -1;
 
             auto *reent    = __syscall_getreent();
             auto *devoptab = devoptab_list[dir->dirData->device];
@@ -212,7 +213,7 @@ void Explorer::render() {
                 this->path = this->path.parent();
             this->need_directory_scan = true;
             this->cur_focused_entry = -1;
-        } else if (want_explore_forward && this->cur_focused_entry != -1u) {
+        } else if (want_explore_forward && this->cur_focused_entry < this->entries.size()) {
             auto &entry = this->entries[this->cur_focused_entry];
             switch (entry.type) {
                 case fs::Node::Type::Directory:
